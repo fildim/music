@@ -22,6 +22,27 @@
     <button id="theme" class="btn small theme-toggle" aria-label="Switch theme" title="Switch theme">◐</button>
   </header>
 
+
+  <section class="intake" id="intake" aria-labelledby="intake-title">
+    <svg class="intake-icon" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+      <path d="M9 5.5h14.5L31 13v21.5a1.5 1.5 0 0 1-1.5 1.5h-20A1.5 1.5 0 0 1 8 34.5V7a1.5 1.5 0 0 1 1-1.5Z" stroke-linejoin="round"/>
+      <path d="M23 5.5V13h7.5" stroke-linejoin="round"/>
+      <path d="M17 28.5V18l7-1.6v9.4" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="15" cy="28.5" r="2.5"/>
+      <circle cx="22" cy="26.9" r="2.5"/>
+    </svg>
+    <div>
+      <p class="intake-title" id="intake-title">Drop your song here</p>
+      <p class="intake-sub" id="intake-sub">Chord sheet <code>.txt</code> <code>.pro</code> <code>.crd</code> · MusicXML <code>.musicxml</code> <code>.mxl</code> · MIDI <code>.mid</code> — or <button type="button" class="linkish" id="go-paste">paste your chords instead</button></p>
+    </div>
+    <div class="intake-actions">
+      <button type="button" class="btn primary" id="btn-choose">Choose a file</button>
+      <button type="button" class="btn" id="btn-sample">Try an example</button>
+    </div>
+    <input type="file" id="file" class="visually-hidden"
+           accept=".txt,.md,.pro,.chordpro,.crd,.cho,.chopro,.musicxml,.xml,.mxl,.mid,.midi">
+  </section>
+
   <main class="workbench">
 
     <!-- ------------------------------------------------------- controls -->
@@ -96,10 +117,10 @@
       <div class="sheet-head">
         <div class="tabs" role="tablist">
           <button type="button" data-tab="result" role="tab" aria-selected="true" aria-controls="pane-result">Transposed</button>
-          <button type="button" data-tab="source" role="tab" aria-selected="false" aria-controls="pane-source">Your song</button>
+          <button type="button" data-tab="source" role="tab" aria-selected="false" aria-controls="pane-source">Paste &amp; edit</button>
         </div>
+        <span class="pill" id="example-pill">Example song</span>
         <span class="spacer"></span>
-        <button id="btn-sample" class="btn small" type="button">Load example</button>
         <button id="btn-copy" class="btn small" type="button">Copy chart</button>
         <button id="btn-download" class="btn small primary" type="button" hidden>Download</button>
         <button id="btn-print" class="btn small" type="button">Print</button>
@@ -124,11 +145,6 @@
             <label for="editor">Paste your chords and lyrics</label>
             <textarea id="editor" class="input" spellcheck="false" aria-describedby="editor-hint"></textarea>
             <p class="hint" id="editor-hint">Chords above lyrics, or ChordPro brackets like <code>[Am]</code>. Click any line in the transposed view to switch it between chords and lyrics if a line was read wrongly.</p>
-          </div>
-          <div class="drop" id="drop">
-            <b>Drop a file here</b> or <label for="file" style="text-decoration:underline;cursor:pointer">browse</label>
-            <input type="file" id="file" class="visually-hidden" accept=".txt,.md,.pro,.chordpro,.crd,.cho,.chopro,.musicxml,.xml,.mxl,.mid,.midi">
-            <div style="margin-top:6px">Chord sheets · MusicXML (.musicxml, .xml, .mxl) · MIDI (.mid)</div>
           </div>
         </div>
       </div>

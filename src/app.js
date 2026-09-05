@@ -44,6 +44,7 @@ const state = {
   simplify: true,
   nashville: false,
   overrides: {},
+  isSample: true,
   tab: 'result',
   singerLow: null,
   singerHigh: null,
@@ -112,6 +113,7 @@ function signatureLine(key) {
 
 function render() {
   const d = derive();
+  renderIntake();
   renderControls(d);
   renderSheet(d);
   renderVoice(d);
@@ -230,6 +232,35 @@ function renderSheet(d) {
 
   $('#btn-download').hidden = state.kind === 'text';
   $('#btn-copy').hidden = state.kind !== 'text';
+}
+
+/** Keep the intake zone in step with what is actually loaded. */
+function renderIntake() {
+  const intake = $('#intake');
+  const loaded = state.filename !== null || (!state.isSample && state.kind === 'text');
+  intake.classList.toggle('loaded', loaded);
+  $('#btn-choose').textContent = loaded ? 'Choose another file' : 'Choose a file';
+  $('#btn-sample').hidden = loaded;
+  $('#example-pill').hidden = !state.isSample;
+
+  if (!loaded) {
+    $('#intake-title').textContent = 'Drop your song here';
+    $('#intake-sub').innerHTML = 'Chord sheet <code>.txt</code> <code>.pro</code> <code>.crd</code> · MusicXML <code>.musicxml</code> <code>.mxl</code> · MIDI <code>.mid</code> — or <button type="button" class="linkish" id="go-paste">paste your chords instead</button>';
+    $('#go-paste').addEventListener('click', showPastePane);
+    return;
+  }
+
+  const kindLabel = { text: 'Chord sheet', musicxml: 'MusicXML score', midi: 'MIDI file' }[state.kind];
+  $('#intake-title').textContent = state.filename ?? 'Your pasted chords';
+  $('#intake-sub').innerHTML = `${kindLabel} loaded — <button type="button" class="linkish" id="go-paste">${state.kind === 'text' ? 'view or edit it' : 'paste chords instead'}</button>`;
+  $('#go-paste').addEventListener('click', showPastePane);
+}
+
+function showPastePane() {
+  const tab = document.querySelector('[data-tab="source"]');
+  tab.click();
+  document.querySelector('.workbench').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setTimeout(() => $('#editor').focus(), 320);
 }
 
 function fileResultCard(headline, detail) {
@@ -374,6 +405,7 @@ function renderVoice(d) {
 
 async function loadFile(file) {
   state.filename = file.name;
+  state.isSample = false;
   state.fileWarnings = [];
   state.overrides = {};
   state.sourceKey = null;
@@ -393,7 +425,8 @@ async function loadFile(file) {
       state.songLow = info.lowMidi; state.songHigh = info.highMidi; state.songRangeFromFile = true;
       if (info.keyChanges) state.fileWarnings.push('This score changes key part-way through. Every section is moved by the same interval, which keeps the music correct.');
     } else if (lower.endsWith('.pdf') || /\.(png|jpe?g|gif|webp|heic|tiff?)$/.test(lower)) {
-      state.fileWarnings.push('A PDF or photo of sheet music can’t be transposed here — there are no notes in the file, only a picture of them. Open it in MuseScore (which can scan simple scores), or export MusicXML from wherever the score came from, then bring that back here.');
+      state.fileWarnings.push(`${file.name} is a PDF or a photo, so it holds a picture of notes rather than notes themselves and cannot be transposed. Open it in MuseScore (which can scan simple scores), or export MusicXML from wherever the score came from, then bring that back here.`);
+      state.filename = null;
       render();
       return;
     } else {
@@ -480,6 +513,8 @@ function wire() {
     state.text = editor.value;
     state.overrides = {};
     state.fileWarnings = [];
+    state.isSample = editor.value === SAMPLE;
+    if (!state.isSample) state.filename = null;
     render();
   });
 
@@ -492,15 +527,34 @@ function wire() {
     });
   }
 
-  $('#file').addEventListener('change', (e) => { if (e.target.files[0]) loadFile(e.target.files[0]); });
-  const drop = $('#drop');
-  for (const type of ['dragenter', 'dragover']) {
-    drop.addEventListener(type, (e) => { e.preventDefault(); drop.classList.add('over'); });
-  }
-  for (const type of ['dragleave', 'drop']) {
-    drop.addEventListener(type, (e) => { e.preventDefault(); drop.classList.remove('over'); });
-  }
-  drop.addEventListener('drop', (e) => { if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
+  $('#btn-choose').addEventListener('click', () => $('#file').click());
+  $('#file').addEventListener('change', (e) => {
+    if (e.target.files[0]) loadFile(e.target.files[0]);
+    e.target.value = '';   // so re-picking the same file still fires
+  });
+
+  // The whole page accepts a drop — aiming at a small target is a needless
+  // demand to make of someone who just wants their song transposed.
+  const intake = $('#intake');
+  let depth = 0;
+  document.addEventListener('dragenter', (e) => {
+    if (![...(e.dataTransfer?.types ?? [])].includes('Files')) return;
+    e.preventDefault(); depth += 1; intake.classList.add('over');
+  });
+  document.addEventListener('dragover', (e) => {
+    if ([...(e.dataTransfer?.types ?? [])].includes('Files')) e.preventDefault();
+  });
+  document.addEventListener('dragleave', () => {
+    depth = Math.max(0, depth - 1);
+    if (depth === 0) intake.classList.remove('over');
+  });
+  document.addEventListener('drop', (e) => {
+    e.preventDefault(); depth = 0; intake.classList.remove('over');
+    if (e.dataTransfer.files[0]) {
+      loadFile(e.dataTransfer.files[0]);
+      document.querySelector('.workbench').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
 
   $('#btn-copy').addEventListener('click', async (e) => {
     await navigator.clipboard.writeText(state.resultText ?? '');
@@ -516,6 +570,7 @@ function wire() {
   $('#btn-sample').addEventListener('click', () => {
     state.kind = 'text'; state.text = SAMPLE; state.overrides = {}; state.fileWarnings = [];
     state.sourceKey = null; state.sourceLocked = false; state.songRangeFromFile = false;
+    state.isSample = true; state.filename = null;
     editor.value = SAMPLE;
     render();
   });
