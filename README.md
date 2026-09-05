@@ -1,5 +1,8 @@
 # Singable Key
 
+**Live: https://fildim.github.io/music/**
+&nbsp;·&nbsp; [single-file copy](https://fildim.github.io/music/standalone.html) (save it, works offline)
+
 A browser tool for moving a song into a key someone can actually sing.
 
 Point it at a chord sheet, a MusicXML score or a MIDI file, choose a new key,
@@ -121,6 +124,12 @@ Open `index.html` in a browser. That's it — no install, no build.
 npm test          # 70 tests, no dependencies (node:test)
 node build.js     # bundles everything into dist/index.html as a single file
 ```
+
+## Publishing it
+
+`.github/workflows/pages.yml` runs the tests, builds the bundle and deploys to
+GitHub Pages on every push. The published site carries both the modular app and
+`standalone.html`, a single self-contained file that works offline.
 
 ## Layout
 
