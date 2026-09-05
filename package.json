@@ -1,0 +1,13 @@
+{
+  "name": "transposer",
+  "version": "1.0.0",
+  "description": "Transpose chord sheets, lyrics-with-chords, MusicXML and MIDI into a singable key.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test 'test/*.test.js'",
+    "build": "node build.js",
+    "serve": "node --experimental-strip-types -e \"\" 2>/dev/null; python3 -m http.server 8080"
+  },
+  "license": "MIT"
+}
