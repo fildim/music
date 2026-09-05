@@ -131,6 +131,11 @@ node build.js     # bundles everything into dist/index.html as a single file
 GitHub Pages on every push. The published site carries both the modular app and
 `standalone.html`, a single self-contained file that works offline.
 
+Pages has to be switched on once by hand — a workflow's own token is not
+permitted to create the site. In the repository go to **Settings → Pages →
+Build and deployment** and set **Source** to **GitHub Actions**. After that
+every push deploys on its own.
+
 ## Layout
 
 ```
