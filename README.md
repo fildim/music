@@ -133,8 +133,10 @@ GitHub Pages on every push. The published site carries both the modular app and
 
 Pages has to be switched on once by hand — a workflow's own token is not
 permitted to create the site. In the repository go to **Settings → Pages →
-Build and deployment** and set **Source** to **GitHub Actions**. After that
-every push deploys on its own.
+Build and deployment** and set **Source** to **GitHub Actions**.
+
+Deploys run from `main`, because the `github-pages` environment only accepts
+deployments from the default branch.
 
 ## Layout
 

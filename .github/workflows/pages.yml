@@ -2,11 +2,8 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    # The app currently lives on the feature branch. Once it is merged you can
-    # drop the second entry and deploy from main alone.
     branches:
       - main
-      - claude/music-transposition-app-iy7teb
   workflow_dispatch:
 
 permissions:
