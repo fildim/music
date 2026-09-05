@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Singable Key</title>
+<meta name="description" content="Transpose a chord sheet, MusicXML score or MIDI file into a key that suits the singer.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Spectral:ital,wght@0,500;0,600;1,500&display=swap">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <div>
+      <p class="eyebrow">Transposer</p>
+      <h1>Put the song in a key they can <span class="sig">actually sing</span></h1>
+      <p>Drop in a chord sheet, a MusicXML score or a MIDI file. Move it by key or by semitone, and every chord, note and key signature is respelled properly — <b>A</b> becomes <b>B♭</b>, not A♯.</p>
+    </div>
+    <button id="theme" class="btn small theme-toggle" aria-label="Switch theme" title="Switch theme">◐</button>
+  </header>
+
+
+  <section class="intake" id="intake" aria-labelledby="intake-title">
+    <svg class="intake-icon" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+      <path d="M9 5.5h14.5L31 13v21.5a1.5 1.5 0 0 1-1.5 1.5h-20A1.5 1.5 0 0 1 8 34.5V7a1.5 1.5 0 0 1 1-1.5Z" stroke-linejoin="round"/>
+      <path d="M23 5.5V13h7.5" stroke-linejoin="round"/>
+      <path d="M17 28.5V18l7-1.6v9.4" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="15" cy="28.5" r="2.5"/>
+      <circle cx="22" cy="26.9" r="2.5"/>
+    </svg>
+    <div>
+      <p class="intake-title" id="intake-title">Drop your song here</p>
+      <p class="intake-sub" id="intake-sub">Chord sheet <code>.txt</code> <code>.pro</code> <code>.crd</code> · MusicXML <code>.musicxml</code> <code>.mxl</code> · MIDI <code>.mid</code> — or <button type="button" class="linkish" id="go-paste">paste your chords instead</button></p>
+    </div>
+    <div class="intake-actions">
+      <button type="button" class="btn primary" id="btn-choose">Choose a file</button>
+      <button type="button" class="btn" id="btn-sample">Try an example</button>
+    </div>
+    <input type="file" id="file" class="visually-hidden"
+           accept=".txt,.md,.pro,.chordpro,.crd,.cho,.chopro,.musicxml,.xml,.mxl,.mid,.midi">
+  </section>
+
+  <main class="workbench">
+
+    <!-- ------------------------------------------------------- controls -->
+    <aside class="panel controls">
+      <h2>Transposition</h2>
+      <div class="panel-body">
+
+        <div class="field">
+          <label for="source-key">From</label>
+          <div class="keypick">
+            <select id="source-key"></select>
+            <select id="source-mode" aria-label="Major or minor">
+              <option value="major">major</option>
+              <option value="minor">minor</option>
+            </select>
+          </div>
+          <p class="sigline"><span class="glyphs" id="source-sig"></span></p>
+          <p class="hint" id="detect-note"></p>
+        </div>
+
+        <div class="field">
+          <label for="target-key">To</label>
+          <select id="target-key"></select>
+          <p class="sigline"><span class="glyphs" id="target-sig"></span></p>
+        </div>
+
+        <div class="field">
+          <label id="lbl-semitone">Or move by semitones</label>
+          <div class="stepper" role="group" aria-labelledby="lbl-semitone">
+            <button id="step-down" type="button" aria-label="Down one semitone">−</button>
+            <div class="readout" id="semitone-readout" aria-live="polite"></div>
+            <button id="step-up" type="button" aria-label="Up one semitone">+</button>
+          </div>
+          <p class="hint" id="capo-hint"></p>
+        </div>
+
+        <div class="field">
+          <label id="lbl-octave">Octave</label>
+          <div class="stepper" role="group" aria-labelledby="lbl-octave">
+            <button id="oct-down" type="button" aria-label="Down one octave">−</button>
+            <div class="readout"><b id="octave-readout">±0</b><span>octaves</span></div>
+            <button id="oct-up" type="button" aria-label="Up one octave">+</button>
+          </div>
+          <p class="hint">An octave is 12 semitones — the same notes, higher or lower. It changes nothing on a chord chart, and it is <em>not</em> what moves a song from E to F. For that, use the key or semitone control above.</p>
+        </div>
+
+        <div class="field">
+          <span class="legend" id="lbl-spelling">Spelling</span>
+          <div class="chips" role="group" aria-labelledby="lbl-spelling">
+            <button class="chip" type="button" data-prefer="auto" aria-pressed="true">Auto</button>
+            <button class="chip" type="button" data-prefer="sharps">♯ Sharps</button>
+            <button class="chip" type="button" data-prefer="flats">♭ Flats</button>
+          </div>
+          <div class="switches">
+            <label class="switch">
+              <input type="checkbox" id="opt-simplify" checked>
+              <span><b>Simplify awkward names</b><i>Write B rather than C♭, unless the key genuinely calls for it.</i></span>
+            </label>
+            <label class="switch">
+              <input type="checkbox" id="opt-nashville">
+              <span><b>Nashville numbers</b><i>Show degrees (1, 4, 5m) instead of chord names — key-independent.</i></span>
+            </label>
+          </div>
+        </div>
+
+        <button id="reset" class="btn" type="button">Back to the original key</button>
+      </div>
+    </aside>
+
+    <!-- ---------------------------------------------------------- sheet -->
+    <section class="panel">
+      <div class="sheet-head">
+        <div class="tabs" role="tablist">
+          <button type="button" data-tab="result" role="tab" aria-selected="true" aria-controls="pane-result">Transposed</button>
+          <button type="button" data-tab="source" role="tab" aria-selected="false" aria-controls="pane-source">Paste &amp; edit</button>
+        </div>
+        <span class="pill" id="example-pill">Example song</span>
+        <span class="spacer"></span>
+        <button id="btn-copy" class="btn small" type="button">Copy chart</button>
+        <button id="btn-download" class="btn small primary" type="button" hidden>Download</button>
+        <button id="btn-print" class="btn small" type="button">Print</button>
+      </div>
+
+      <div class="summary">
+        <div><dt>From</dt><dd id="stat-from">—</dd></div>
+        <div><dt>To</dt><dd id="stat-to">—</dd></div>
+        <div><dt>Move</dt><dd id="stat-move">—</dd></div>
+        <div><dt>Chords found</dt><dd class="num" id="stat-chords">—</dd></div>
+        <div><dt>Format</dt><dd id="stat-format">—</dd></div>
+      </div>
+
+      <div id="pane-result" role="tabpanel">
+        <div id="output"></div>
+        <div class="notes" id="notes" hidden></div>
+      </div>
+
+      <div id="pane-source" role="tabpanel" hidden>
+        <div class="panel-body">
+          <div class="field">
+            <label for="editor">Paste your chords and lyrics</label>
+            <textarea id="editor" class="input" spellcheck="false" aria-describedby="editor-hint"></textarea>
+            <p class="hint" id="editor-hint">Chords above lyrics, or ChordPro brackets like <code>[Am]</code>. Click any line in the transposed view to switch it between chords and lyrics if a line was read wrongly.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ----------------------------------------------------- voice finder -->
+  <section class="voice">
+    <p class="eyebrow">Find the key</p>
+    <h2 style="margin:4px 0 18px;font:600 24px/1.2 var(--display);letter-spacing:-.01em">Which key suits this singer?</h2>
+    <div class="voice-grid">
+
+      <div class="panel">
+        <h2>Ranges</h2>
+        <div class="panel-body">
+          <div class="field">
+            <label for="voice-preset">Voice type</label>
+            <select id="voice-preset"></select>
+            <p class="hint">A starting point only — everyone's range is their own. Adjust the notes below to what the singer is actually comfortable with.</p>
+          </div>
+          <div class="field">
+            <span class="legend">Singer's comfortable range</span>
+            <div class="pair">
+              <input type="text" id="singer-low" placeholder="lowest, e.g. A2" aria-label="Singer's lowest comfortable note">
+              <input type="text" id="singer-high" placeholder="highest, e.g. F4" aria-label="Singer's highest comfortable note">
+            </div>
+            <p class="hint" id="singer-range-text">—</p>
+          </div>
+          <div class="field">
+            <span class="legend">The melody's range</span>
+            <div class="pair">
+              <input type="text" id="song-low" placeholder="lowest, e.g. E4" aria-label="Melody's lowest note">
+              <input type="text" id="song-high" placeholder="highest, e.g. E5" aria-label="Melody's highest note">
+            </div>
+            <p class="hint" id="song-range-text">—</p>
+            <p class="hint">Read automatically from a MusicXML or MIDI file. For a chord sheet, enter the melody's lowest and highest notes yourself — pitch names with an octave number, like <code>G3</code> or <code>F#4</code> (middle C is <code>C4</code>).</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Fit</h2>
+        <div class="keyboard-wrap">
+          <div class="keyboard" id="keyboard" role="img" aria-label="Keyboard showing the singer's range against the song's range"></div>
+          <div class="legend-row">
+            <span><i class="swatch" style="background:color-mix(in srgb, var(--accent) 30%, transparent);border:1px solid var(--accent)"></i> Singer's range</span>
+            <span><i class="swatch" style="background:var(--muted);opacity:.6"></i> Song now</span>
+            <span><i class="swatch" style="background:var(--changed)"></i> Song transposed</span>
+          </div>
+        </div>
+        <div class="verdict" id="verdict"></div>
+        <div class="options-list" id="shift-options"></div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="colophon">
+    <div>
+      <h3>What it reads</h3>
+      <ul>
+        <li>Chord sheets — chords above lyrics, or ChordPro <code>[C]</code> brackets</li>
+        <li>MusicXML — <code>.musicxml</code>, <code>.xml</code>, and zipped <code>.mxl</code></li>
+        <li>MIDI — <code>.mid</code>, <code>.midi</code></li>
+      </ul>
+    </div>
+    <div>
+      <h3>What it can't</h3>
+      <ul>
+        <li>A PDF or a photo of a score holds a picture of notes, not notes. Export MusicXML from MuseScore, Finale, Dorico or Sibelius and bring that back here.</li>
+        <li>Guitar tablature is left untouched — moving tab means re-fingering it, not renaming it.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>How it spells things</h3>
+      <ul>
+        <li>Transposition moves the letter and the pitch together, so in E→F an A chord becomes B♭ and not A♯.</li>
+        <li>Key signatures, printed accidentals and slash-chord bass notes all follow.</li>
+        <li>Everything runs in your browser. No file you open is uploaded anywhere.</li>
+      </ul>
+    </div>
+  </footer>
+</div>
+
+<script type="module" src="src/app.js"></script>
+</body>
+</html>

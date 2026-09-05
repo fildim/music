@@ -1,0 +1,2720 @@
+<title>Singable Key</title>
+<meta name="description" content="Transpose a chord sheet, MusicXML score or MIDI file into a key that suits the singer.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Spectral:ital,wght@0,500;0,600;1,500&display=swap">
+<style>
+/* ------------------------------------------------------------ tokens ---
+   Light palette is defined in full on bare :root, because most viewers see
+   the un-stamped document where only prefers-color-scheme applies. */
+:root {
+  --paper:        #f4f6f8;
+  --surface:      #ffffff;
+  --surface-sunk: #eef1f5;
+  --ink:          #131820;
+  --ink-soft:     #414c5c;
+  --muted:        #6b7686;
+  --rule:         #dce1e8;
+  --rule-strong:  #c3cbd6;
+  --accent:       #2b5a7a;
+  --accent-ink:   #1d3d54;
+  --accent-soft:  #e2ecf3;
+  --changed:      #a2560f;
+  --changed-soft: #fbeedf;
+  --good:         #2c6a4c;
+  --warn:         #86610f;
+  --warn-soft:    #fbf1da;
+  --shadow:       0 1px 2px rgba(19, 24, 32, .06), 0 8px 24px -12px rgba(19, 24, 32, .18);
+  --sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --display: "Spectral", ui-serif, Georgia, "Times New Roman", serif;
+  --r-sm: 4px;
+  --r-md: 8px;
+  --r-lg: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:        #0e1218;
+    --surface:      #161c25;
+    --surface-sunk: #10151c;
+    --ink:          #e7ebf1;
+    --ink-soft:     #b9c2ce;
+    --muted:        #8b95a4;
+    --rule:         #252d39;
+    --rule-strong:  #384354;
+    --accent:       #7fb0d1;
+    --accent-ink:   #a8cbe3;
+    --accent-soft:  #17242e;
+    --changed:      #e0a165;
+    --changed-soft: #2a2118;
+    --good:         #7ec4a1;
+    --warn:         #d8b165;
+    --warn-soft:    #262015;
+    --shadow:       0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px -14px rgba(0, 0, 0, .7);
+  }
+}
+:root[data-theme="dark"] {
+  --paper:        #0e1218;
+  --surface:      #161c25;
+  --surface-sunk: #10151c;
+  --ink:          #e7ebf1;
+  --ink-soft:     #b9c2ce;
+  --muted:        #8b95a4;
+  --rule:         #252d39;
+  --rule-strong:  #384354;
+  --accent:       #7fb0d1;
+  --accent-ink:   #a8cbe3;
+  --accent-soft:  #17242e;
+  --changed:      #e0a165;
+  --changed-soft: #2a2118;
+  --good:         #7ec4a1;
+  --warn:         #d8b165;
+  --warn-soft:    #262015;
+  --shadow:       0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px -14px rgba(0, 0, 0, .7);
+}
+
+* { box-sizing: border-box; }
+
+/* .btn and .notes set a display, which otherwise silently defeats [hidden]. */
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 15px/1.55 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: 1240px; margin: 0 auto; padding: 0 20px 72px; }
+
+/* ------------------------------------------------------------ header --- */
+.masthead {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 20px 32px;
+  padding: 34px 0 22px;
+  border-bottom: 1px solid var(--rule);
+}
+.masthead h1 {
+  margin: 0;
+  font: 600 34px/1.1 var(--display);
+  letter-spacing: -.015em;
+  text-wrap: balance;
+}
+.masthead h1 .sig { color: var(--accent); font-style: italic; font-weight: 500; }
+.masthead p { margin: 6px 0 0; color: var(--ink-soft); max-width: 58ch; }
+.masthead .theme-toggle { margin-left: auto; }
+
+.eyebrow {
+  font: 500 11px/1 var(--sans);
+  letter-spacing: .13em; text-transform: uppercase; color: var(--muted);
+}
+
+
+/* ------------------------------------------------------------ intake ---
+   The first question anyone has is "where does my song go?", so this sits
+   directly under the masthead and above everything else. */
+.intake {
+  margin-top: 22px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px 20px;
+  align-items: center;
+  padding: 20px 24px;
+  border: 2px dashed var(--rule-strong);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  transition: border-color .14s ease, background .14s ease;
+}
+.intake.over {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+/* Once a song is in, the zone stops shouting and becomes a status bar. */
+.intake.loaded {
+  border-style: solid;
+  border-color: var(--rule);
+  padding: 14px 24px;
+  box-shadow: var(--shadow);
+}
+.intake-icon {
+  width: 38px; height: 38px; flex: none;
+  color: var(--accent);
+}
+.intake.loaded .intake-icon { width: 26px; height: 26px; }
+.intake-title {
+  margin: 0;
+  font: 600 19px/1.25 var(--display);
+  letter-spacing: -.005em;
+}
+.intake.loaded .intake-title {
+  font: 500 15px/1.3 var(--mono);
+  word-break: break-all;
+}
+.intake-sub { margin: 3px 0 0; font-size: 13px; color: var(--muted); }
+.intake-sub code {
+  font: 400 12px/1 var(--mono);
+  background: var(--surface-sunk);
+  padding: 1px 5px; border-radius: 3px;
+}
+.intake-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 720px) {
+  .intake { grid-template-columns: auto minmax(0, 1fr); padding: 16px 18px; }
+  .intake-actions { grid-column: 1 / -1; }
+}
+
+.linkish {
+  border: 0; background: none; padding: 0;
+  color: var(--accent); font: inherit; cursor: pointer;
+  text-decoration: underline; text-underline-offset: 2px;
+}
+.linkish:hover { color: var(--accent-ink); }
+
+.pill {
+  font: 500 11px/1 var(--sans);
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: 5px 9px; border-radius: 999px;
+  background: var(--surface-sunk); color: var(--muted);
+  border: 1px solid var(--rule);
+}
+
+/* ------------------------------------------------------------ layout --- */
+.workbench {
+  display: grid; gap: 22px;
+  grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+  align-items: start;
+  padding-top: 22px;
+}
+@media (max-width: 940px) { .workbench { grid-template-columns: minmax(0, 1fr); } }
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+}
+.panel > h2 {
+  margin: 0;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--rule);
+  font: 600 13px/1 var(--sans);
+  letter-spacing: .04em; text-transform: uppercase; color: var(--ink-soft);
+  display: flex; align-items: center; gap: 10px;
+}
+.panel-body { padding: 18px; display: flex; flex-direction: column; gap: 18px; }
+
+.field { display: flex; flex-direction: column; gap: 7px; }
+.field > label, .legend { font: 500 12px/1 var(--sans); letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.hint { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+
+/* ----------------------------------------------------------- controls --- */
+input, select, textarea, button { font-family: inherit; font-size: inherit; color: inherit; }
+
+select, input[type="text"], input[type="number"] {
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-md);
+  padding: 8px 10px;
+  min-width: 0;
+}
+select:focus-visible, input:focus-visible, textarea:focus-visible, button:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 8px 13px;
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  font-weight: 500;
+  transition: background .12s ease, border-color .12s ease;
+}
+.btn:hover { background: var(--surface-sunk); border-color: var(--muted); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+:root[data-theme="dark"] .btn.primary,
+:root:not([data-theme="light"]) .btn.primary { color: var(--paper); }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .btn.primary { color: #fff; } }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.small { padding: 5px 9px; font-size: 13px; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+
+/* The transposition stepper: the single most-used control on the page. */
+.stepper {
+  display: grid; grid-template-columns: 40px 1fr 40px; align-items: stretch; gap: 8px;
+}
+.stepper button {
+  background: var(--surface); border: 1px solid var(--rule-strong); border-radius: var(--r-md);
+  cursor: pointer; font: 500 19px/1 var(--sans);
+}
+.stepper button:hover { background: var(--accent-soft); border-color: var(--accent); }
+.stepper .readout {
+  text-align: center; padding: 8px 4px;
+  border: 1px solid var(--rule); border-radius: var(--r-md);
+  background: var(--surface-sunk);
+}
+.stepper .readout b { display: block; font: 600 20px/1.2 var(--mono); font-variant-numeric: tabular-nums; }
+.stepper .readout span { font-size: 11.5px; color: var(--muted); }
+
+.keyrow { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: end; }
+.keyrow .arrow { padding-bottom: 9px; color: var(--muted); font-size: 18px; }
+.keypick { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
+
+/* A key signature is the fastest way to show how far a key really moved. */
+.sigline {
+  display: flex; align-items: baseline; gap: 6px;
+  font: 500 12px/1 var(--sans); color: var(--muted);
+}
+.sigline .glyphs { font: 500 15px/1 var(--display); color: var(--accent); letter-spacing: .06em; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  padding: 4px 9px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--rule-strong); background: var(--surface);
+  font: 500 12.5px/1.5 var(--mono); font-variant-numeric: tabular-nums;
+}
+.chip:hover { border-color: var(--accent); }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+:root[data-theme="dark"] .chip[aria-pressed="true"] { color: var(--paper); }
+
+.switches { display: flex; flex-direction: column; gap: 9px; }
+.switch { display: flex; gap: 9px; align-items: flex-start; cursor: pointer; font-size: 13.5px; }
+.switch input { margin: 2px 0 0; accent-color: var(--accent); }
+.switch span b { font-weight: 500; }
+.switch span i { display: block; font-style: normal; font-size: 12px; color: var(--muted); }
+
+/* --------------------------------------------------------- the sheet --- */
+.sheet-head {
+  display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center;
+  padding: 12px 18px; border-bottom: 1px solid var(--rule);
+}
+.sheet-head .spacer { flex: 1 1 auto; }
+
+.summary {
+  display: flex; flex-wrap: wrap; gap: 0;
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface-sunk);
+  border-radius: 0;
+}
+.summary div {
+  flex: 1 1 150px; padding: 12px 18px;
+  border-right: 1px solid var(--rule);
+}
+.summary div:last-child { border-right: 0; }
+.summary dt { font: 500 11px/1 var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 0 0 5px; }
+.summary dd { margin: 0; font: 500 15px/1.3 var(--sans); }
+.summary dd .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+.sheet-scroll { overflow-x: auto; }
+pre.sheet {
+  margin: 0; padding: 18px;
+  font: 400 13.5px/1.75 var(--mono);
+  white-space: pre;
+  tab-size: 8;
+}
+pre.sheet .chord { color: var(--changed); font-weight: 600; }
+pre.sheet .directive { color: var(--muted); font-style: italic; }
+pre.sheet .ln {
+  display: block;
+  border-left: 3px solid transparent;
+  padding-left: 9px;
+  margin-left: -12px;
+}
+pre.sheet .ln.is-chords { border-left-color: var(--changed-soft); }
+pre.sheet .ln.clickable { cursor: pointer; }
+pre.sheet .ln.clickable:hover { background: var(--accent-soft); border-left-color: var(--accent); }
+
+textarea.input {
+  width: 100%; min-height: 260px; resize: vertical;
+  padding: 14px 16px;
+  border: 1px solid var(--rule-strong); border-radius: var(--r-md);
+  background: var(--surface);
+  font: 400 13.5px/1.7 var(--mono);
+  white-space: pre; overflow-wrap: normal; overflow-x: auto;
+}
+
+.tabs { display: flex; gap: 2px; padding: 3px; background: var(--surface-sunk); border-radius: var(--r-md); }
+.tabs button {
+  border: 0; background: transparent; padding: 6px 12px; border-radius: var(--r-sm);
+  cursor: pointer; font: 500 13px/1 var(--sans); color: var(--muted);
+}
+.tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+
+/* --------------------------------------------------------- messages --- */
+.notes { display: flex; flex-direction: column; gap: 8px; padding: 14px 18px; border-top: 1px solid var(--rule); }
+.note {
+  display: flex; gap: 9px; align-items: flex-start;
+  font-size: 13px; line-height: 1.5;
+  padding: 9px 12px; border-radius: var(--r-md);
+  background: var(--warn-soft); color: var(--ink-soft);
+  border-left: 3px solid var(--warn);
+}
+.note.info { background: var(--accent-soft); border-left-color: var(--accent); }
+.note.bad  { background: var(--changed-soft); border-left-color: var(--changed); }
+
+/* ------------------------------------------------------ voice finder --- */
+.voice { padding-top: 34px; }
+.voice-grid { display: grid; gap: 22px; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); align-items: start; }
+@media (max-width: 940px) { .voice-grid { grid-template-columns: minmax(0, 1fr); } }
+
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* Keyboard strip: singer's comfortable range against the song's range. */
+.keyboard-wrap { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.keyboard {
+  position: relative; height: 96px;
+  border: 1px solid var(--rule-strong); border-radius: var(--r-sm);
+  overflow: hidden; background: var(--surface);
+  user-select: none;
+}
+.keyboard .white {
+  position: absolute; top: 0; bottom: 0;
+  border-right: 1px solid var(--rule);
+  background: var(--surface);
+}
+.keyboard .black {
+  position: absolute; top: 0; height: 60%;
+  background: var(--ink); border-radius: 0 0 2px 2px; z-index: 2;
+}
+.keyboard .band {
+  position: absolute; z-index: 3; border-radius: 2px;
+  pointer-events: none;
+}
+.keyboard .band.singer { top: 0; bottom: 0; background: color-mix(in srgb, var(--accent) 17%, transparent); border-left: 2px solid var(--accent); border-right: 2px solid var(--accent); }
+.keyboard .band.before { top: 8px;  height: 12px; background: var(--muted); opacity: .5; }
+.keyboard .band.after  { top: 26px; height: 12px; background: var(--changed); }
+.keyboard .octave-label {
+  position: absolute; bottom: 3px; z-index: 4;
+  font: 500 9.5px/1 var(--mono); color: var(--muted);
+}
+.legend-row { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12.5px; color: var(--ink-soft); }
+.legend-row span { display: inline-flex; align-items: center; gap: 7px; }
+.swatch { width: 13px; height: 13px; border-radius: 3px; flex: none; }
+
+.verdict { display: flex; flex-direction: column; gap: 4px; padding: 14px 18px; border-top: 1px solid var(--rule); }
+.verdict .headline { font: 500 17px/1.35 var(--sans); }
+.verdict .headline b { font-family: var(--mono); font-weight: 600; color: var(--changed); }
+.verdict.fits .headline b { color: var(--good); }
+
+.options-list { display: flex; flex-direction: column; }
+.option-row {
+  display: grid; grid-template-columns: 62px 1fr auto; gap: 12px; align-items: center;
+  padding: 9px 18px; border-top: 1px solid var(--rule);
+  font-size: 13.5px;
+}
+.option-row .shift { font: 600 14px/1 var(--mono); font-variant-numeric: tabular-nums; color: var(--accent); }
+.option-row .rng { color: var(--muted); font-family: var(--mono); font-size: 12.5px; }
+.option-row .tag { font-size: 11.5px; padding: 2px 7px; border-radius: 999px; background: var(--surface-sunk); color: var(--muted); }
+.option-row .tag.ok { background: color-mix(in srgb, var(--good) 15%, transparent); color: var(--good); }
+
+footer.colophon {
+  margin-top: 44px; padding-top: 22px; border-top: 1px solid var(--rule);
+  color: var(--muted); font-size: 13px; line-height: 1.6;
+  display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+footer.colophon h3 { margin: 0 0 6px; font: 500 12px/1 var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); }
+footer.colophon ul { margin: 0; padding-left: 17px; }
+footer.colophon li { margin-bottom: 3px; }
+footer.colophon code { font: 400 12px/1 var(--mono); background: var(--surface-sunk); padding: 1px 4px; border-radius: 3px; }
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+@media print {
+  .panel > h2, .masthead p, .controls, .voice, footer.colophon, .sheet-head, .notes, .theme-toggle { display: none !important; }
+  body { background: #fff; color: #000; }
+  .workbench { grid-template-columns: 1fr; padding: 0; }
+  .panel { border: 0; box-shadow: none; }
+  pre.sheet { font-size: 12px; }
+  pre.sheet .chord { color: #000; font-weight: 700; }
+}
+
+</style>
+<div class="wrap">
+
+  <header class="masthead">
+    <div>
+      <p class="eyebrow">Transposer</p>
+      <h1>Put the song in a key they can <span class="sig">actually sing</span></h1>
+      <p>Drop in a chord sheet, a MusicXML score or a MIDI file. Move it by key or by semitone, and every chord, note and key signature is respelled properly — <b>A</b> becomes <b>B♭</b>, not A♯.</p>
+    </div>
+    <button id="theme" class="btn small theme-toggle" aria-label="Switch theme" title="Switch theme">◐</button>
+  </header>
+
+
+  <section class="intake" id="intake" aria-labelledby="intake-title">
+    <svg class="intake-icon" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+      <path d="M9 5.5h14.5L31 13v21.5a1.5 1.5 0 0 1-1.5 1.5h-20A1.5 1.5 0 0 1 8 34.5V7a1.5 1.5 0 0 1 1-1.5Z" stroke-linejoin="round"/>
+      <path d="M23 5.5V13h7.5" stroke-linejoin="round"/>
+      <path d="M17 28.5V18l7-1.6v9.4" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="15" cy="28.5" r="2.5"/>
+      <circle cx="22" cy="26.9" r="2.5"/>
+    </svg>
+    <div>
+      <p class="intake-title" id="intake-title">Drop your song here</p>
+      <p class="intake-sub" id="intake-sub">Chord sheet <code>.txt</code> <code>.pro</code> <code>.crd</code> · MusicXML <code>.musicxml</code> <code>.mxl</code> · MIDI <code>.mid</code> — or <button type="button" class="linkish" id="go-paste">paste your chords instead</button></p>
+    </div>
+    <div class="intake-actions">
+      <button type="button" class="btn primary" id="btn-choose">Choose a file</button>
+      <button type="button" class="btn" id="btn-sample">Try an example</button>
+    </div>
+    <input type="file" id="file" class="visually-hidden"
+           accept=".txt,.md,.pro,.chordpro,.crd,.cho,.chopro,.musicxml,.xml,.mxl,.mid,.midi">
+  </section>
+
+  <main class="workbench">
+
+    <!-- ------------------------------------------------------- controls -->
+    <aside class="panel controls">
+      <h2>Transposition</h2>
+      <div class="panel-body">
+
+        <div class="field">
+          <label for="source-key">From</label>
+          <div class="keypick">
+            <select id="source-key"></select>
+            <select id="source-mode" aria-label="Major or minor">
+              <option value="major">major</option>
+              <option value="minor">minor</option>
+            </select>
+          </div>
+          <p class="sigline"><span class="glyphs" id="source-sig"></span></p>
+          <p class="hint" id="detect-note"></p>
+        </div>
+
+        <div class="field">
+          <label for="target-key">To</label>
+          <select id="target-key"></select>
+          <p class="sigline"><span class="glyphs" id="target-sig"></span></p>
+        </div>
+
+        <div class="field">
+          <label id="lbl-semitone">Or move by semitones</label>
+          <div class="stepper" role="group" aria-labelledby="lbl-semitone">
+            <button id="step-down" type="button" aria-label="Down one semitone">−</button>
+            <div class="readout" id="semitone-readout" aria-live="polite"></div>
+            <button id="step-up" type="button" aria-label="Up one semitone">+</button>
+          </div>
+          <p class="hint" id="capo-hint"></p>
+        </div>
+
+        <div class="field">
+          <label id="lbl-octave">Octave</label>
+          <div class="stepper" role="group" aria-labelledby="lbl-octave">
+            <button id="oct-down" type="button" aria-label="Down one octave">−</button>
+            <div class="readout"><b id="octave-readout">±0</b><span>octaves</span></div>
+            <button id="oct-up" type="button" aria-label="Up one octave">+</button>
+          </div>
+          <p class="hint">An octave is 12 semitones — the same notes, higher or lower. It changes nothing on a chord chart, and it is <em>not</em> what moves a song from E to F. For that, use the key or semitone control above.</p>
+        </div>
+
+        <div class="field">
+          <span class="legend" id="lbl-spelling">Spelling</span>
+          <div class="chips" role="group" aria-labelledby="lbl-spelling">
+            <button class="chip" type="button" data-prefer="auto" aria-pressed="true">Auto</button>
+            <button class="chip" type="button" data-prefer="sharps">♯ Sharps</button>
+            <button class="chip" type="button" data-prefer="flats">♭ Flats</button>
+          </div>
+          <div class="switches">
+            <label class="switch">
+              <input type="checkbox" id="opt-simplify" checked>
+              <span><b>Simplify awkward names</b><i>Write B rather than C♭, unless the key genuinely calls for it.</i></span>
+            </label>
+            <label class="switch">
+              <input type="checkbox" id="opt-nashville">
+              <span><b>Nashville numbers</b><i>Show degrees (1, 4, 5m) instead of chord names — key-independent.</i></span>
+            </label>
+          </div>
+        </div>
+
+        <button id="reset" class="btn" type="button">Back to the original key</button>
+      </div>
+    </aside>
+
+    <!-- ---------------------------------------------------------- sheet -->
+    <section class="panel">
+      <div class="sheet-head">
+        <div class="tabs" role="tablist">
+          <button type="button" data-tab="result" role="tab" aria-selected="true" aria-controls="pane-result">Transposed</button>
+          <button type="button" data-tab="source" role="tab" aria-selected="false" aria-controls="pane-source">Paste &amp; edit</button>
+        </div>
+        <span class="pill" id="example-pill">Example song</span>
+        <span class="spacer"></span>
+        <button id="btn-copy" class="btn small" type="button">Copy chart</button>
+        <button id="btn-download" class="btn small primary" type="button" hidden>Download</button>
+        <button id="btn-print" class="btn small" type="button">Print</button>
+      </div>
+
+      <div class="summary">
+        <div><dt>From</dt><dd id="stat-from">—</dd></div>
+        <div><dt>To</dt><dd id="stat-to">—</dd></div>
+        <div><dt>Move</dt><dd id="stat-move">—</dd></div>
+        <div><dt>Chords found</dt><dd class="num" id="stat-chords">—</dd></div>
+        <div><dt>Format</dt><dd id="stat-format">—</dd></div>
+      </div>
+
+      <div id="pane-result" role="tabpanel">
+        <div id="output"></div>
+        <div class="notes" id="notes" hidden></div>
+      </div>
+
+      <div id="pane-source" role="tabpanel" hidden>
+        <div class="panel-body">
+          <div class="field">
+            <label for="editor">Paste your chords and lyrics</label>
+            <textarea id="editor" class="input" spellcheck="false" aria-describedby="editor-hint"></textarea>
+            <p class="hint" id="editor-hint">Chords above lyrics, or ChordPro brackets like <code>[Am]</code>. Click any line in the transposed view to switch it between chords and lyrics if a line was read wrongly.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ----------------------------------------------------- voice finder -->
+  <section class="voice">
+    <p class="eyebrow">Find the key</p>
+    <h2 style="margin:4px 0 18px;font:600 24px/1.2 var(--display);letter-spacing:-.01em">Which key suits this singer?</h2>
+    <div class="voice-grid">
+
+      <div class="panel">
+        <h2>Ranges</h2>
+        <div class="panel-body">
+          <div class="field">
+            <label for="voice-preset">Voice type</label>
+            <select id="voice-preset"></select>
+            <p class="hint">A starting point only — everyone's range is their own. Adjust the notes below to what the singer is actually comfortable with.</p>
+          </div>
+          <div class="field">
+            <span class="legend">Singer's comfortable range</span>
+            <div class="pair">
+              <input type="text" id="singer-low" placeholder="lowest, e.g. A2" aria-label="Singer's lowest comfortable note">
+              <input type="text" id="singer-high" placeholder="highest, e.g. F4" aria-label="Singer's highest comfortable note">
+            </div>
+            <p class="hint" id="singer-range-text">—</p>
+          </div>
+          <div class="field">
+            <span class="legend">The melody's range</span>
+            <div class="pair">
+              <input type="text" id="song-low" placeholder="lowest, e.g. E4" aria-label="Melody's lowest note">
+              <input type="text" id="song-high" placeholder="highest, e.g. E5" aria-label="Melody's highest note">
+            </div>
+            <p class="hint" id="song-range-text">—</p>
+            <p class="hint">Read automatically from a MusicXML or MIDI file. For a chord sheet, enter the melody's lowest and highest notes yourself — pitch names with an octave number, like <code>G3</code> or <code>F#4</code> (middle C is <code>C4</code>).</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Fit</h2>
+        <div class="keyboard-wrap">
+          <div class="keyboard" id="keyboard" role="img" aria-label="Keyboard showing the singer's range against the song's range"></div>
+          <div class="legend-row">
+            <span><i class="swatch" style="background:color-mix(in srgb, var(--accent) 30%, transparent);border:1px solid var(--accent)"></i> Singer's range</span>
+            <span><i class="swatch" style="background:var(--muted);opacity:.6"></i> Song now</span>
+            <span><i class="swatch" style="background:var(--changed)"></i> Song transposed</span>
+          </div>
+        </div>
+        <div class="verdict" id="verdict"></div>
+        <div class="options-list" id="shift-options"></div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="colophon">
+    <div>
+      <h3>What it reads</h3>
+      <ul>
+        <li>Chord sheets — chords above lyrics, or ChordPro <code>[C]</code> brackets</li>
+        <li>MusicXML — <code>.musicxml</code>, <code>.xml</code>, and zipped <code>.mxl</code></li>
+        <li>MIDI — <code>.mid</code>, <code>.midi</code></li>
+      </ul>
+    </div>
+    <div>
+      <h3>What it can't</h3>
+      <ul>
+        <li>A PDF or a photo of a score holds a picture of notes, not notes. Export MusicXML from MuseScore, Finale, Dorico or Sibelius and bring that back here.</li>
+        <li>Guitar tablature is left untouched — moving tab means re-fingering it, not renaming it.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>How it spells things</h3>
+      <ul>
+        <li>Transposition moves the letter and the pitch together, so in E→F an A chord becomes B♭ and not A♯.</li>
+        <li>Key signatures, printed accidentals and slash-chord bass notes all follow.</li>
+        <li>Everything runs in your browser. No file you open is uploaded anywhere.</li>
+      </ul>
+    </div>
+  </footer>
+</div>
+
+<script type="module">
+const __m = {};
+/* ---- src/theory.js ---- */
+{
+/**
+ * Core pitch model.
+ *
+ * The whole app rests on one idea: transposition is an INTERVAL, not a
+ * pitch-class lookup. A pitch-class transposer turns E->F correctly but then
+ * spells the A chord as "A#" instead of "Bb". An interval transposer moves the
+ * letter and the pitch independently, so every note lands on the right staff
+ * line with the right accidental.
+ *
+ * A note is { letter: 'A'..'G', alter: -2..2, octave: number|null }.
+ * `octave` is scientific pitch notation (middle C = C4 = MIDI 60); it is null
+ * for pitch-class-only contexts such as chord symbols.
+ */
+
+const LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+const NATURAL_PC = [0, 2, 4, 5, 7, 9, 11];
+// Position of each natural on the circle of fifths (= sharps in its major key).
+const LETTER_FIFTHS = { F: -1, C: 0, G: 1, D: 2, A: 3, E: 4, B: 5 };
+
+const SHARP_CHARS = new Set(['#', '♯']);
+const FLAT_CHARS = new Set(['b', '♭']);
+const DOUBLE_SHARP_CHARS = new Set(['x', 'X', '\u{1D12A}']);
+const DOUBLE_FLAT_CHARS = new Set(['\u{1D12B}']);
+const NATURAL_CHARS = new Set(['♮']);
+
+const mod = (n, m) => ((n % m) + m) % m;
+
+function letterIndex(letter) {
+  return LETTERS.indexOf(letter);
+}
+
+function naturalPc(letter) {
+  return NATURAL_PC[letterIndex(letter)];
+}
+
+/**
+ * Parse an accidental run. Returns null for nonsense such as "#b" or "###".
+ */
+function accidentalToAlter(text) {
+  if (!text) return 0;
+  let alter = 0;
+  let sawSharp = false;
+  let sawFlat = false;
+  for (const ch of text) {
+    if (SHARP_CHARS.has(ch)) { alter += 1; sawSharp = true; }
+    else if (FLAT_CHARS.has(ch)) { alter -= 1; sawFlat = true; }
+    else if (DOUBLE_SHARP_CHARS.has(ch)) { alter += 2; sawSharp = true; }
+    else if (DOUBLE_FLAT_CHARS.has(ch)) { alter -= 2; sawFlat = true; }
+    else if (NATURAL_CHARS.has(ch)) { /* no-op */ }
+    else return null;
+  }
+  if (sawSharp && sawFlat) return null;   // "C#b" is not a note
+  if (alter < -2 || alter > 2) return null;
+  return alter;
+}
+
+function alterToAccidental(alter, unicode = false) {
+  const sharp = unicode ? '♯' : '#';
+  const flat = unicode ? '♭' : 'b';
+  if (alter === 0) return '';
+  return alter > 0 ? sharp.repeat(alter) : flat.repeat(-alter);
+}
+
+const NOTE_RE = /^([A-Ga-g])((?:[#b♯♭♮x]|\u{1D12A}|\u{1D12B})*)(-?\d{1,2})?$/u;
+
+function parseNote(text, opts = {}) {
+  const { allowLowercase = false, requireOctave = false, allowOctave = true } = opts;
+  if (typeof text !== 'string') return null;
+  const m = NOTE_RE.exec(text.trim());
+  if (!m) return null;
+  let letter = m[1];
+  if (letter >= 'a' && letter <= 'g') {
+    if (!allowLowercase) return null;
+    letter = letter.toUpperCase();
+  }
+  const alter = accidentalToAlter(m[2]);
+  if (alter === null) return null;
+  if (m[3] !== undefined && !allowOctave) return null;
+  const octave = m[3] === undefined ? null : parseInt(m[3], 10);
+  if (requireOctave && octave === null) return null;
+  if (octave !== null && (octave < -1 || octave > 10)) return null;
+  return { letter, alter, octave };
+}
+
+function noteName(note, { unicode = false, withOctave = true } = {}) {
+  const oct = withOctave && note.octave !== null && note.octave !== undefined ? String(note.octave) : '';
+  return note.letter + alterToAccidental(note.alter, unicode) + oct;
+}
+
+function pitchClass(note) {
+  return mod(naturalPc(note.letter) + note.alter, 12);
+}
+
+function noteToMidi(note) {
+  if (note.octave === null || note.octave === undefined) return null;
+  return (note.octave + 1) * 12 + naturalPc(note.letter) + note.alter;
+}
+
+const SHARP_SPELLING = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const FLAT_SPELLING = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+
+/** MIDI number -> spelled note. `prefer` is 'sharps' or 'flats'. */
+function midiToNote(midi, prefer = 'sharps') {
+  const pc = mod(midi, 12);
+  const name = (prefer === 'flats' ? FLAT_SPELLING : SHARP_SPELLING)[pc];
+  const parsed = parseNote(name);
+  parsed.octave = Math.floor(midi / 12) - 1;
+  return parsed;
+}
+
+/* ------------------------------------------------------------------ keys */
+
+/** A key is { tonic: note, mode: 'major'|'minor' }. */
+function makeKey(tonicText, mode = 'major') {
+  const tonic = typeof tonicText === 'string'
+    ? parseNote(tonicText, { allowOctave: false })
+    : tonicText;
+  if (!tonic) return null;
+  return { tonic: { letter: tonic.letter, alter: tonic.alter, octave: null }, mode };
+}
+
+/** Signed count of sharps (+) or flats (-) in the key signature. */
+function keyFifths(key) {
+  const base = LETTER_FIFTHS[key.tonic.letter] + 7 * key.tonic.alter;
+  return key.mode === 'minor' ? base - 3 : base;
+}
+
+function keyName(key, { unicode = false } = {}) {
+  return noteName(key.tonic, { unicode, withOctave: false }) + (key.mode === 'minor' ? 'm' : '');
+}
+
+function keyLabel(key, { unicode = false } = {}) {
+  return noteName(key.tonic, { unicode, withOctave: false } ) + (key.mode === 'minor' ? ' minor' : ' major');
+}
+
+function parseKey(text) {
+  if (typeof text !== 'string') return null;
+  const trimmed = text.trim();
+  const m = /^([A-G](?:[#b♯♭]{1,2})?)\s*(m|min|minor|maj|major)?$/.exec(trimmed);
+  if (!m) return null;
+  const tonic = parseNote(m[1], { allowOctave: false });
+  if (!tonic) return null;
+  const mode = m[2] && /^m(in(or)?)?$/.test(m[2]) ? 'minor' : 'major';
+  return { tonic, mode };
+}
+
+/**
+ * Choose how to SPELL a key of a given pitch class.
+ *
+ * Ranked by the number of accidentals in the resulting key signature, so a
+ * pitch class of 10 becomes Bb (2 flats) rather than A# (10 sharps). Ties
+ * (F# vs Gb major, 6 either way) fall to `prefer`, then to the sharp/flat
+ * leaning of `hintFifths` (normally the source key).
+ */
+function spellKey(pc, mode = 'major', prefer = 'auto', hintFifths = 0) {
+  const candidates = [];
+  for (const letter of LETTERS) {
+    for (let alter = -2; alter <= 2; alter++) {
+      if (mod(NATURAL_PC[letterIndex(letter)] + alter, 12) !== mod(pc, 12)) continue;
+      const key = { tonic: { letter, alter, octave: null }, mode };
+      candidates.push({ key, fifths: keyFifths(key) });
+    }
+  }
+  const wantSharp = prefer === 'sharps' ? 1 : prefer === 'flats' ? -1 : Math.sign(hintFifths) || 1;
+  candidates.sort((a, b) => {
+    const d = Math.abs(a.fifths) - Math.abs(b.fifths);
+    if (d !== 0) return d;
+    const aMatches = Math.sign(a.fifths) === wantSharp ? 0 : 1;
+    const bMatches = Math.sign(b.fifths) === wantSharp ? 0 : 1;
+    return aMatches - bMatches;
+  });
+  return candidates[0].key;
+}
+
+/* ------------------------------------------------------- transpositions */
+
+/**
+ * A transposition is a letter step plus a semitone step. Both are signed, and
+ * both may exceed one octave (letterStep 7 == semitoneStep 12 == one octave).
+ */
+function buildTransposition(sourceKey, targetKey, semitones) {
+  const letterSimple = mod(letterIndex(targetKey.tonic.letter) - letterIndex(sourceKey.tonic.letter), 7);
+  const semitoneSimple = mod(pitchClass(targetKey.tonic) - pitchClass(sourceKey.tonic), 12);
+  if (mod(semitones - semitoneSimple, 12) !== 0) {
+    throw new Error(
+      `semitones (${semitones}) is not consistent with ${keyName(sourceKey)} -> ${keyName(targetKey)}`,
+    );
+  }
+  const octaveShift = Math.round((semitones - semitoneSimple) / 12);
+  return {
+    letterStep: letterSimple + 7 * octaveShift,
+    semitoneStep: semitoneSimple + 12 * octaveShift,
+    sourceKey,
+    targetKey,
+  };
+}
+
+/** Identity transposition (used when only the octave moves, or nothing does). */
+function octaveTransposition(octaves) {
+  return { letterStep: 7 * octaves, semitoneStep: 12 * octaves, sourceKey: null, targetKey: null };
+}
+
+const PLACEHOLDER_OCTAVE = 4;
+
+function transposeNote(note, t) {
+  const hasOctave = note.octave !== null && note.octave !== undefined;
+  const octave = hasOctave ? note.octave : PLACEHOLDER_OCTAVE;
+  const li = letterIndex(note.letter);
+
+  const diatonic = octave * 7 + li + t.letterStep;
+  const newOctave = Math.floor(diatonic / 7);
+  const newLetterIndex = mod(diatonic, 7);
+
+  const midi = (octave + 1) * 12 + NATURAL_PC[li] + note.alter + t.semitoneStep;
+  const newAlter = midi - ((newOctave + 1) * 12 + NATURAL_PC[newLetterIndex]);
+
+  return {
+    letter: LETTERS[newLetterIndex],
+    alter: newAlter,
+    octave: hasOctave ? newOctave : null,
+  };
+}
+
+/** True when a note needs more than a double sharp/flat and must be respelled. */
+function isUnspellable(note) {
+  return note.alter < -2 || note.alter > 2;
+}
+
+/** Fall back to a plain sharp/flat spelling when the interval produces C###. */
+function respell(note, prefer = 'sharps') {
+  const pc = mod(naturalPc(note.letter) + note.alter, 12);
+  const name = (prefer === 'flats' ? FLAT_SPELLING : SHARP_SPELLING)[pc];
+  const fixed = parseNote(name, { allowOctave: false });
+  // Keep the sounding octave, which may differ from the spelled one (Cb4 sounds B3).
+  if (note.octave !== null && note.octave !== undefined) {
+    const midi = (note.octave + 1) * 12 + naturalPc(note.letter) + note.alter;
+    fixed.octave = Math.floor(midi / 12) - 1;
+  } else {
+    fixed.octave = null;
+  }
+  return fixed;
+}
+
+/** Semitone distance from key A up to key B, always in 0..11. */
+function semitonesBetweenKeys(a, b) {
+  return mod(pitchClass(b.tonic) - pitchClass(a.tonic), 12);
+}
+
+/** Signed distance in -6..+5, i.e. "the shortest way to get there". */
+function nearestSemitones(a, b) {
+  const up = semitonesBetweenKeys(a, b);
+  return up > 6 ? up - 12 : up;
+}
+
+const INTERVAL_NAMES = {
+  0: 'unison', 1: 'minor 2nd', 2: 'major 2nd', 3: 'minor 3rd', 4: 'major 3rd',
+  5: 'perfect 4th', 6: 'tritone', 7: 'perfect 5th', 8: 'minor 6th',
+  9: 'major 6th', 10: 'minor 7th', 11: 'major 7th', 12: 'octave',
+};
+
+function describeSemitones(semitones) {
+  if (semitones === 0) return 'no change';
+  const dir = semitones > 0 ? 'up' : 'down';
+  const abs = Math.abs(semitones);
+  const octaves = Math.floor(abs / 12);
+  const rest = abs % 12;
+  const parts = [];
+  if (octaves) parts.push(octaves === 1 ? '1 octave' : `${octaves} octaves`);
+  if (rest) parts.push(INTERVAL_NAMES[rest]);
+  return `${dir} ${parts.join(' + ')} (${semitones > 0 ? '+' : ''}${semitones} semitone${abs === 1 ? '' : 's'})`;
+}
+
+/** The seven diatonic triads of a key, as { pc, quality, degree }. */
+const MAJOR_STEPS = [0, 2, 4, 5, 7, 9, 11];
+const MAJOR_QUALITIES = ['', 'm', 'm', '', '', 'm', 'dim'];
+const MAJOR_DEGREES = ['I', 'ii', 'iii', 'IV', 'V', 'vi', 'vii'];
+const MINOR_STEPS = [0, 2, 3, 5, 7, 8, 10];
+const MINOR_QUALITIES = ['m', 'dim', '', 'm', 'm', '', ''];
+const MINOR_DEGREES = ['i', 'ii', 'III', 'iv', 'v', 'VI', 'VII'];
+
+function diatonicTriads(key) {
+  const steps = key.mode === 'minor' ? MINOR_STEPS : MAJOR_STEPS;
+  const quals = key.mode === 'minor' ? MINOR_QUALITIES : MAJOR_QUALITIES;
+  const degs = key.mode === 'minor' ? MINOR_DEGREES : MAJOR_DEGREES;
+  const root = pitchClass(key.tonic);
+  return steps.map((s, i) => ({ pc: mod(root + s, 12), quality: quals[i], degree: degs[i] }));
+}
+
+/** Spelled scale of the key, used for Nashville numbers and note spelling. */
+function keyScale(key) {
+  const steps = key.mode === 'minor' ? MINOR_STEPS : MAJOR_STEPS;
+  const tonicLetter = letterIndex(key.tonic.letter);
+  const tonicPc = pitchClass(key.tonic);
+  return steps.map((semitone, i) => {
+    const li = mod(tonicLetter + i, 7);
+    const natural = NATURAL_PC[li];
+    let alter = mod(tonicPc + semitone - natural, 12);
+    if (alter > 6) alter -= 12;
+    return { letter: LETTERS[li], alter, octave: null };
+  });
+}
+
+/**
+ * Interval transposition is right for diatonic material but can spell an
+ * out-of-key chord as Cb or E##. Where the note is NOT part of the target key
+ * and an enharmonic exists with fewer accidentals, prefer that enharmonic.
+ *
+ * The in-key guard matters: E# really is the 7th degree of F# major and must
+ * stay E#, while a Cb chord in F major should just be written B.
+ */
+function simplifySpelling(note, targetKey) {
+  if (!targetKey) return isUnspellable(note) ? respell(note) : note;
+  if (note.alter === 0) return note;
+
+  const scale = keyScale(targetKey);
+  if (scale.some((s) => s.letter === note.letter && s.alter === note.alter)) return note;
+
+  const pc = mod(naturalPc(note.letter) + note.alter, 12);
+  let best = null;
+  for (const letter of LETTERS) {
+    for (let alter = -2; alter <= 2; alter++) {
+      if (mod(NATURAL_PC[letterIndex(letter)] + alter, 12) !== pc) continue;
+      if (Math.abs(alter) < Math.abs(note.alter) && (!best || Math.abs(alter) < Math.abs(best.alter))) {
+        best = { letter, alter, octave: null };
+      }
+    }
+  }
+  if (!best) return isUnspellable(note) ? respell(note) : note;
+
+  if (note.octave !== null && note.octave !== undefined) {
+    const midi = (note.octave + 1) * 12 + naturalPc(note.letter) + note.alter;
+    best.octave = Math.floor(midi / 12) - 1;
+  }
+  return best;
+}
+
+/** Transpose and tidy in one step — the entry point the rest of the app uses. */
+function transposeAndSpell(note, t, { simplify = true } = {}) {
+  const moved = transposeNote(note, t);
+  if (!simplify) return isUnspellable(moved) ? respell(moved) : moved;
+  return simplifySpelling(moved, t.targetKey);
+}
+
+Object.assign(__m, { LETTERS, mod, letterIndex, naturalPc, accidentalToAlter, alterToAccidental, parseNote, noteName, pitchClass, noteToMidi, midiToNote, makeKey, keyFifths, keyName, keyLabel, parseKey, spellKey, buildTransposition, octaveTransposition, transposeNote, isUnspellable, respell, semitonesBetweenKeys, nearestSemitones, INTERVAL_NAMES, describeSemitones, diatonicTriads, keyScale, simplifySpelling, transposeAndSpell });
+}
+
+/* ---- src/chords.js ---- */
+{
+const { parseNote, noteName, transposeAndSpell, pitchClass, mod } = __m;
+/**
+ * Chord symbol parsing.
+ *
+ * The hard part is not transposition, it is deciding what IS a chord. A
+ * permissive parser reads the lyric "Bad" as B-add and "Cage" as C-aug, and
+ * then silently rewrites the words in someone's song. So the quality after the
+ * root is matched against a closed grammar:
+ *
+ *     quality := base? extension*
+ *
+ * "Bad" -> root B, rest "ad": "a" is not a base and "ad" is not "add" -> not a
+ * chord. "Cage", "Face", "Amen", "Golden", "Around" all fail the same way.
+ */
+
+
+
+const BASE_TOKENS = [
+  'major', 'minor', 'MAJ', 'Maj', 'maj', 'Min', 'min', 'dim', 'DIM', 'aug', 'AUG',
+  'M', 'm', '-', '+', '°', 'o', 'ø', 'Ø', 'Δ', '△', '^',
+].sort((a, b) => b.length - a.length);
+
+const EXT_TOKENS = [
+  'maj13', 'maj11', 'maj9', 'maj7', 'Maj7', 'MAJ7', 'M13', 'M11', 'M9', 'M7',
+  'Δ7', '△7', '^7', 'sus4', 'sus2', 'sus', 'add13', 'add11', 'add9', 'add6',
+  'add4', 'add2', 'add', 'alt', 'no3', 'no5', 'omit3', 'omit5', 'dim7', 'dim',
+  '13', '11', '69', '9', '7', '6', '5', '4', '3', '2', '(', ')', ',', '/', ' ',
+].sort((a, b) => b.length - a.length);
+
+const ALTERATION_RE = /^[#b♯♭+-]\d{1,2}/;
+const ROOT_RE = /^([A-G])((?:[#b♯♭]){0,2})([\s\S]*)$/;
+const BASS_RE = /^([\s\S]*)\/([A-G](?:[#b♯♭]){0,2})$/;
+
+/** Bar lines, repeats and rhythm slashes that legitimately sit on a chord line. */
+const MARKERS = new Set([
+  '|', '||', '|:', ':|', ':||', '||:', '|.', '/', '//', '%', '-', '(', ')',
+  '*', 'N.C.', 'NC', 'n.c.', '.', '¦',
+]);
+const MARKER_RE = /^(?:x\d{1,2}|\d{1,2}x|\(\d{1,2}x\)|\[\d{1,2}x\])$/i;
+
+function isMarker(token) {
+  return MARKERS.has(token) || MARKER_RE.test(token);
+}
+
+function validQuality(quality) {
+  if (quality === '') return { valid: true, weak: false };
+  let i = 0;
+  let weak = false;
+
+  for (const token of BASE_TOKENS) {
+    if (quality.startsWith(token)) {
+      // A bare "o" for diminished is real notation (Co7) but also the tail of
+      // the words "Do" and "Go", so chords built on it are flagged as weak.
+      if (token === 'o' || token === 'O') weak = true;
+      i = token.length;
+      break;
+    }
+  }
+
+  let depth = 0;
+  let guard = 0;
+  while (i < quality.length) {
+    if (guard++ > 64) return { valid: false, weak };
+    const rest = quality.slice(i);
+
+    const alt = ALTERATION_RE.exec(rest);
+    if (alt) { i += alt[0].length; continue; }
+
+    let matched = null;
+    for (const token of EXT_TOKENS) {
+      if (rest.startsWith(token)) { matched = token; break; }
+    }
+    if (!matched) return { valid: false, weak };
+    if (matched === '(') depth += 1;
+    if (matched === ')') { if (depth === 0) return { valid: false, weak }; depth -= 1; }
+    i += matched.length;
+  }
+  return { valid: depth === 0, weak };
+}
+
+/**
+ * Parse a single token. Returns null when the token is not a chord.
+ * `weak` marks chords whose reading is plausible but not certain, so the line
+ * classifier can refuse to rewrite a lyric line that just says "Go".
+ */
+function parseChord(token) {
+  if (typeof token !== 'string' || token === '') return null;
+  const rootMatch = ROOT_RE.exec(token);
+  if (!rootMatch) return null;
+
+  const root = parseNote(rootMatch[1] + rootMatch[2], { allowOctave: false });
+  if (!root) return null;
+
+  let rest = rootMatch[3];
+  let bass = null;
+  const bassMatch = BASS_RE.exec(rest);
+  if (bassMatch) {
+    const candidate = parseNote(bassMatch[2], { allowOctave: false });
+    if (candidate) { bass = candidate; rest = bassMatch[1]; }
+  }
+
+  const { valid, weak } = validQuality(rest);
+  if (!valid) return null;
+  return { root, quality: rest, bass, weak };
+}
+
+function formatChord(chord, { unicode = false } = {}) {
+  let out = noteName(chord.root, { unicode, withOctave: false }) + chord.quality;
+  if (chord.bass) out += '/' + noteName(chord.bass, { unicode, withOctave: false });
+  return out;
+}
+
+function transposeChord(chord, t, opts = {}) {
+  return {
+    root: transposeAndSpell(chord.root, t, opts),
+    quality: chord.quality,
+    bass: chord.bass ? transposeAndSpell(chord.bass, t, opts) : null,
+    weak: chord.weak,
+  };
+}
+
+/** Convenience: "Am7/G" -> "Bbm7/Ab" in one call. Returns the input unchanged
+ *  if it is not a chord, so it is safe to map over arbitrary tokens. */
+function transposeToken(token, t, opts = {}) {
+  const chord = parseChord(token);
+  if (!chord) return token;
+  return formatChord(transposeChord(chord, t, opts), opts);
+}
+
+/* --------------------------------------------------- Nashville numbers */
+
+const MAJOR_STEPS = [0, 2, 4, 5, 7, 9, 11];
+const MINOR_STEPS = [0, 2, 3, 5, 7, 8, 10];
+// Minor-key charts spell the lowered degrees explicitly, so 1 2 b3 4 5 b6 b7.
+const MAJOR_LABELS = ['1', '2', '3', '4', '5', '6', '7'];
+const MINOR_LABELS = ['1', '2', 'b3', '4', '5', 'b6', 'b7'];
+// Chromatic degrees use the conventional spelling (b7, not #6; #4, not b5).
+const MAJOR_CHROMATIC = { 1: 'b2', 3: 'b3', 6: '#4', 8: 'b6', 10: 'b7' };
+const MINOR_CHROMATIC = { 1: 'b2', 4: '3', 6: '#4', 9: '6', 11: '7' };
+
+function degreeLabel(interval, mode) {
+  const steps = mode === 'minor' ? MINOR_STEPS : MAJOR_STEPS;
+  const labels = mode === 'minor' ? MINOR_LABELS : MAJOR_LABELS;
+  const index = steps.indexOf(interval);
+  if (index !== -1) return labels[index];
+  return (mode === 'minor' ? MINOR_CHROMATIC : MAJOR_CHROMATIC)[interval] ?? null;
+}
+
+function chordToNashville(chord, key) {
+  const tonicPc = pitchClass(key.tonic);
+  const label = degreeLabel(mod(pitchClass(chord.root) - tonicPc, 12), key.mode);
+  if (label === null) return null;
+
+  let out = label + chord.quality;
+  if (chord.bass) {
+    const bassLabel = degreeLabel(mod(pitchClass(chord.bass) - tonicPc, 12), key.mode);
+    out += '/' + (bassLabel ?? noteName(chord.bass, { withOctave: false }));
+  }
+  return out;
+}
+
+Object.assign(__m, { isMarker, parseChord, formatChord, transposeChord, transposeToken, chordToNashville });
+}
+
+/* ---- src/sheet.js ---- */
+{
+const { parseChord, formatChord, transposeChord, isMarker, chordToNashville, parseKey, keyName } = __m;
+/**
+ * Chord-sheet parsing and transposition.
+ *
+ * Handles the two formats people actually have:
+ *   1. ChordPro / inline brackets:  "I [C]once was [G]lost"
+ *   2. Chords on their own line above the lyric line:
+ *          C           G
+ *          I once was lost
+ *
+ * Format 2 is where transposition usually goes wrong. Chord names change
+ * WIDTH (A -> Bb), so a naive replace slides every later chord off the syllable
+ * it belongs to. Each chord is re-anchored to its original column instead, and
+ * only pushed right when the previous chord genuinely overruns it.
+ */
+
+
+
+
+const DIRECTIVE_RE = /^\s*\{\s*([^:}]+?)\s*(?::\s*([\s\S]*?))?\s*\}\s*$/;
+const START_TAB = /^(start_of_tab|sot)$/i;
+const END_TAB = /^(end_of_tab|eot)$/i;
+const KEY_DIRECTIVE = /^(key|k)$/i;
+// A run of 3+ dashes next to a bar line is guitar tablature, not a chord line.
+const TAB_LINE_RE = /-{3,}/;
+const BRACKET_RE = /\[([^\][]*)\]/g;
+// Token wrappers that appear around chords in real sheets: (C)  C7,  [G]
+const WRAP_RE = /^([([{]*)([\s\S]*?)([)\]}]*[,.;]?)$/;
+
+function expandTabs(text, width = 8) {
+  return text.split('\n').map((line) => {
+    if (!line.includes('\t')) return line;
+    let out = '';
+    for (const ch of line) {
+      if (ch === '\t') out += ' '.repeat(width - (out.length % width));
+      else out += ch;
+    }
+    return out;
+  }).join('\n');
+}
+
+function tokenize(line) {
+  const tokens = [];
+  const re = /\S+/g;
+  let m;
+  while ((m = re.exec(line)) !== null) {
+    const raw = m[0];
+    const wrap = WRAP_RE.exec(raw);
+    tokens.push({
+      raw,
+      core: wrap[2],
+      prefix: wrap[1],
+      suffix: wrap[3],
+      start: m.index,
+      end: m.index + raw.length,
+      chord: parseChord(wrap[2]),
+    });
+  }
+  return tokens;
+}
+
+function classifyPlainLine(line) {
+  if (line.trim() === '') return { type: 'blank' };
+  if (TAB_LINE_RE.test(line) && /[|:]/.test(line)) return { type: 'tab' };
+
+  const tokens = tokenize(line);
+  const chords = tokens.filter((t) => t.chord);
+  const markers = tokens.filter((t) => !t.chord && isMarker(t.core));
+  if (chords.length === 0) return { type: 'lyric' };
+  if (chords.length + markers.length !== tokens.length) return { type: 'lyric' };
+
+  // "Go" parses as G-diminished. A line whose only chords are weak readings is
+  // treated as a lyric unless there are several of them.
+  const strong = chords.filter((t) => !t.chord.weak);
+  if (strong.length === 0 && chords.length < 2) return { type: 'lyric' };
+
+  return { type: 'chords', tokens };
+}
+
+/**
+ * Split the text into classified lines. `overrides` maps a line index to a
+ * forced type ('chords' or 'lyric'), so a wrong guess is always correctable
+ * from the UI rather than being silently baked in.
+ */
+function analyzeSheet(rawText, overrides = {}) {
+  const hadTabs = rawText.includes('\t');
+  const text = hadTabs ? expandTabs(rawText) : rawText;
+  const lines = [];
+  const chords = [];
+  const warnings = [];
+  let inTabBlock = false;
+  let sawTab = false;
+  let bracketCount = 0;
+  let declaredKey = null;
+
+  text.split('\n').forEach((raw, index) => {
+    const directive = DIRECTIVE_RE.exec(raw);
+    if (directive) {
+      const name = directive[1];
+      if (START_TAB.test(name)) inTabBlock = true;
+      if (END_TAB.test(name)) inTabBlock = false;
+      if (KEY_DIRECTIVE.test(name) && directive[2]) {
+        const parsed = parseKey(directive[2]);
+        if (parsed) declaredKey = parsed;
+      }
+      lines.push({ index, raw, type: 'directive', name, value: directive[2] ?? null });
+      return;
+    }
+
+    if (inTabBlock) {
+      sawTab = true;
+      lines.push({ index, raw, type: 'tab' });
+      return;
+    }
+
+    // Inline brackets win: they are unambiguous, so no guessing is needed.
+    const brackets = [];
+    BRACKET_RE.lastIndex = 0;
+    let m;
+    while ((m = BRACKET_RE.exec(raw)) !== null) {
+      const chord = parseChord(m[1].trim());
+      brackets.push({ start: m.index, end: m.index + m[0].length, inner: m[1], chord });
+      if (chord) chords.push(chord);
+    }
+    if (brackets.some((b) => b.chord)) {
+      bracketCount += brackets.filter((b) => b.chord).length;
+      lines.push({ index, raw, type: 'chordpro', brackets });
+      return;
+    }
+
+    const forced = overrides[index];
+    let result = classifyPlainLine(raw);
+    if (forced === 'lyric' && result.type === 'chords') result = { type: 'lyric' };
+    if (forced === 'chords' && (result.type === 'lyric' || result.type === 'tab')) {
+      result = { type: 'chords', tokens: tokenize(raw) };
+    }
+    if (result.type === 'tab') sawTab = true;
+    if (result.type === 'chords') {
+      for (const t of result.tokens) if (t.chord) chords.push(t.chord);
+    }
+    lines.push({ index, raw, ...result });
+  });
+
+  if (hadTabs) warnings.push('Tab characters were expanded to spaces (8-column stops) so chords stay aligned.');
+  if (sawTab) warnings.push('Guitar tablature was left untouched — transposing tab needs re-fingering, not renaming.');
+
+  return {
+    lines,
+    chords,
+    warnings,
+    declaredKey,
+    format: bracketCount > 0 ? 'chordpro' : 'plain',
+  };
+}
+
+/**
+ * Rebuild a chord line, keeping every chord over the syllable it started on.
+ * Chords only move right, and only as far as the previous chord forces them.
+ */
+function rebuildChordLine(original, replacements) {
+  let out = '';
+  const segments = [];
+  let prevEnd = 0;
+
+  for (const r of replacements) {
+    const between = original.slice(prevEnd, r.start);
+    let lead = '';
+    let core = '';
+    let trail = '';
+    if (/^\s*$/.test(between)) {
+      trail = between;
+    } else {
+      const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(between);
+      [, lead, core, trail] = m;
+    }
+
+    const minLead = lead.length ? 1 : 0;
+    const minTrail = trail.length ? 1 : 0;
+    const minTotal = minLead + core.length + minTrail;
+    const total = Math.max(r.start - out.length, minTotal);
+    const extra = total - minTotal;
+
+    let leadWidth = minLead;
+    let trailWidth = minTrail;
+    if (extra > 0) {
+      if (lead.length > 0 && lead.length >= trail.length) leadWidth += extra;
+      else trailWidth += extra;
+    }
+
+    const gap = ' '.repeat(leadWidth) + core + ' '.repeat(trailWidth);
+    if (gap) segments.push({ text: gap, kind: 'plain' });
+    out += gap;
+    segments.push({ text: r.text, kind: r.kind ?? 'chord' });
+    out += r.text;
+    prevEnd = r.end;
+  }
+
+  const tail = original.slice(prevEnd).replace(/\s+$/, '');
+  if (tail) {
+    segments.push({ text: tail, kind: 'plain' });
+    out += tail;
+  }
+  return { text: out, segments };
+}
+
+function renderChordText(chord, t, opts) {
+  if (opts.nashville && opts.nashvilleKey) {
+    const n = chordToNashville(chord, opts.nashvilleKey);
+    if (n !== null) return n;
+  }
+  return formatChord(transposeChord(chord, t, opts), opts);
+}
+
+/**
+ * Apply a transposition to an analyzed sheet.
+ * Returns the new text plus per-line segments so the UI can highlight chords.
+ */
+function transposeSheet(analysis, t, options = {}) {
+  const opts = { simplify: true, unicode: false, nashville: false, ...options };
+  const outLines = [];
+
+  for (const line of analysis.lines) {
+    switch (line.type) {
+      case 'directive': {
+        if (KEY_DIRECTIVE.test(line.name) && line.value) {
+          const parsed = parseKey(line.value);
+          if (parsed && t.targetKey) {
+            const replaced = line.raw.replace(line.value, keyName(t.targetKey, { unicode: opts.unicode }));
+            outLines.push({ type: 'directive', text: replaced, segments: [{ text: replaced, kind: 'directive' }] });
+            break;
+          }
+        }
+        outLines.push({ type: 'directive', text: line.raw, segments: [{ text: line.raw, kind: 'directive' }] });
+        break;
+      }
+
+      case 'chordpro': {
+        let text = '';
+        const segments = [];
+        let cursor = 0;
+        for (const b of line.brackets) {
+          const before = line.raw.slice(cursor, b.start);
+          if (before) { segments.push({ text: before, kind: 'plain' }); text += before; }
+          if (b.chord) {
+            const inner = renderChordText(b.chord, t, opts);
+            segments.push({ text: `[${inner}]`, kind: 'chord' });
+            text += `[${inner}]`;
+          } else {
+            segments.push({ text: line.raw.slice(b.start, b.end), kind: 'plain' });
+            text += line.raw.slice(b.start, b.end);
+          }
+          cursor = b.end;
+        }
+        const rest = line.raw.slice(cursor);
+        if (rest) { segments.push({ text: rest, kind: 'plain' }); text += rest; }
+        outLines.push({ type: 'chordpro', text, segments });
+        break;
+      }
+
+      case 'chords': {
+        // Bar lines and rhythm slashes keep their own columns alongside chords.
+        const replacements = line.tokens.map((tok) => (tok.chord
+          ? {
+            start: tok.start,
+            end: tok.end,
+            kind: 'chord',
+            text: tok.prefix + renderChordText(tok.chord, t, opts) + tok.suffix,
+          }
+          : { start: tok.start, end: tok.end, kind: 'plain', text: tok.raw }));
+        const built = rebuildChordLine(line.raw, replacements);
+        outLines.push({ type: 'chords', text: built.text, segments: built.segments });
+        break;
+      }
+
+      default:
+        outLines.push({ type: line.type, text: line.raw, segments: [{ text: line.raw, kind: 'plain' }] });
+    }
+  }
+
+  return { text: outLines.map((l) => l.text).join('\n'), lines: outLines };
+}
+
+Object.assign(__m, { expandTabs, analyzeSheet, transposeSheet });
+}
+
+/* ---- src/detect.js ---- */
+{
+const { makeKey, pitchClass, mod, spellKey, keyFifths, parseChord } = __m;
+/**
+ * Key detection from a chord list.
+ *
+ * Scores all 24 keys by how well the chords fit their diatonic triads, with
+ * extra weight on the chords that actually establish a key: the tonic (and
+ * especially the LAST chord, since songs land on home) and the dominant.
+ */
+
+
+
+
+/** Reduce a chord quality string to the triad it implies. */
+function triadQuality(chord) {
+  const q = chord.quality;
+  if (/^(dim|°|o(?!m)|ø|Ø)/.test(q) || /b5/.test(q) && /^(m|min|-)/.test(q)) return 'dim';
+  if (/^(aug|\+)/.test(q) || /^[^b]*#5/.test(q)) return 'aug';
+  if (/^(maj|Maj|MAJ|M(?![a-z])|Δ|△|\^)/.test(q)) return 'maj';
+  if (/^(m|min|Min|minor|-)/.test(q)) return 'min';
+  if (/^sus/.test(q)) return 'sus';
+  return 'maj';
+}
+
+const MAJOR = [
+  { step: 0, quality: 'maj', weight: 6 },
+  { step: 2, quality: 'min', weight: 3 },
+  { step: 4, quality: 'min', weight: 3 },
+  { step: 5, quality: 'maj', weight: 5 },
+  { step: 7, quality: 'maj', weight: 6 },
+  { step: 9, quality: 'min', weight: 4 },
+  { step: 11, quality: 'dim', weight: 2 },
+];
+
+const MINOR = [
+  { step: 0, quality: 'min', weight: 6 },
+  { step: 2, quality: 'dim', weight: 2 },
+  { step: 3, quality: 'maj', weight: 4 },
+  { step: 5, quality: 'min', weight: 5 },
+  { step: 7, quality: 'min', weight: 4 },
+  { step: 7, quality: 'maj', weight: 5 },   // harmonic minor V — very common
+  { step: 8, quality: 'maj', weight: 4 },
+  { step: 10, quality: 'maj', weight: 4 },
+];
+
+function scoreKey(chords, key) {
+  const table = key.mode === 'minor' ? MINOR : MAJOR;
+  const tonic = pitchClass(key.tonic);
+  let score = 0;
+
+  chords.forEach((chord) => {
+    const interval = mod(pitchClass(chord.root) - tonic, 12);
+    const quality = triadQuality(chord);
+    const exact = table.find((d) => d.step === interval && (d.quality === quality || quality === 'sus'));
+    if (exact) { score += exact.weight; return; }
+    const rootOnly = table.find((d) => d.step === interval);
+    if (rootOnly) { score += 1; return; }   // borrowed/secondary chord
+    score -= 3;                             // genuinely foreign
+  });
+
+  if (chords.length) {
+    const first = mod(pitchClass(chords[0].root) - tonic, 12);
+    const last = mod(pitchClass(chords[chords.length - 1].root) - tonic, 12);
+    if (first === 0) score += 4;
+    if (last === 0) score += 8;             // ending on home is the strongest cue
+    else if (last === 7) score += 1;
+  }
+  return score;
+}
+
+/**
+ * Rank every key. Returns [{ key, score, confidence }] best first.
+ *
+ * Candidates are enumerated by pitch class, not by letter+accidental, so Bb
+ * major and A# major do not compete against each other as if they were rivals.
+ * The winning pitch class is then SPELLED by key-signature complexity, which is
+ * why Bb (2 flats) is reported rather than A# (10 sharps).
+ */
+function rankKeys(chords) {
+  if (!chords.length) return [];
+
+  // A sheet written with Bb and Eb chords is a flat sheet; let that steer ties
+  // such as F# major vs Gb major.
+  let lean = 0;
+  for (const chord of chords) lean += Math.sign(chord.root.alter);
+
+  const results = [];
+  for (let pc = 0; pc < 12; pc += 1) {
+    for (const mode of ['major', 'minor']) {
+      const key = spellKey(pc, mode, 'auto', lean);
+      results.push({ key, score: scoreKey(chords, key) });
+    }
+  }
+  results.sort((a, b) => b.score - a.score || Math.abs(keyFifths(a.key)) - Math.abs(keyFifths(b.key)));
+
+  const best = results[0].score;
+  const runnerUp = results[1]?.score ?? 0;
+  const spread = Math.max(1, Math.abs(best));
+  return results.map((r, i) => ({
+    ...r,
+    confidence: i === 0 ? Math.max(0, Math.min(1, (best - runnerUp) / spread)) : 0,
+  }));
+}
+
+function detectKey(chords, declaredKey = null) {
+  if (declaredKey) return { key: declaredKey, confidence: 1, source: 'declared' };
+  const ranked = rankKeys(chords);
+  if (!ranked.length) return null;
+  return { key: ranked[0].key, confidence: ranked[0].confidence, source: 'detected', ranked: ranked.slice(0, 4) };
+}
+
+/** Convenience for callers holding raw text tokens rather than chord objects. */
+function detectKeyFromTokens(tokens) {
+  return detectKey(tokens.map(parseChord).filter(Boolean));
+}
+
+
+Object.assign(__m, { triadQuality, rankKeys, detectKey, detectKeyFromTokens, makeKey });
+}
+
+/* ---- src/musicxml.js ---- */
+{
+const { parseNote, noteToMidi, transposeAndSpell, keyFifths, noteName } = __m;
+/**
+ * MusicXML transposition.
+ *
+ * Rewrites only the elements that carry pitch and leaves the rest of the file
+ * exactly as it was found — no DOM round-trip, so comments, DOCTYPE, layout and
+ * formatting all survive, and the result opens cleanly in MuseScore/Sibelius.
+ *
+ * What is changed: <pitch> in every <note>, <fifths> in every <key>, and the
+ * <root>/<bass> of every <harmony> (chord symbol).
+ * What is deliberately NOT changed: <transpose> (that describes the instrument,
+ * not the music) and <unpitched> (percussion has no key).
+ */
+
+
+
+const NOTE_BLOCK = /<note\b[^>]*>[\s\S]*?<\/note>/g;
+const KEY_BLOCK = /<key\b[^>]*>[\s\S]*?<\/key>/g;
+const HARMONY_BLOCK = /<harmony\b[^>]*>[\s\S]*?<\/harmony>/g;
+const PITCH_BLOCK = /<pitch\b[^>]*>[\s\S]*?<\/pitch>/;
+
+const ACCIDENTAL_NAMES = { '-2': 'flat-flat', '-1': 'flat', 0: 'natural', 1: 'sharp', 2: 'double-sharp' };
+
+const tag = (name, body) => new RegExp(`<${name}>\\s*([^<]*?)\\s*</${name}>`);
+
+function readTag(xml, name) {
+  const m = tag(name).exec(xml);
+  return m ? m[1] : null;
+}
+
+function writeTag(xml, name, value) {
+  return xml.replace(tag(name), `<${name}>${value}</${name}>`);
+}
+
+function removeTag(xml, name) {
+  return xml.replace(new RegExp(`\\s*<${name}>[^<]*</${name}>`), '');
+}
+
+/** Insert <alter> immediately after <step>, which is where the schema wants it. */
+function insertAlter(pitchXml, value) {
+  return pitchXml.replace(/(<step>[^<]*<\/step>)/, `$1<alter>${value}</alter>`);
+}
+
+/** Read the file's own key signature and melodic range without changing it. */
+function inspectMusicXml(xml) {
+  const fifthsMatches = [...xml.matchAll(/<fifths>\s*(-?\d+)\s*<\/fifths>/g)].map((m) => parseInt(m[1], 10));
+  const modeMatch = /<mode>\s*([a-zA-Z]+)\s*<\/mode>/.exec(xml);
+
+  let low = null;
+  let high = null;
+  let count = 0;
+  for (const block of xml.match(NOTE_BLOCK) ?? []) {
+    const pitch = PITCH_BLOCK.exec(block);
+    if (!pitch) continue;
+    const step = readTag(pitch[0], 'step');
+    const octave = readTag(pitch[0], 'octave');
+    const alter = readTag(pitch[0], 'alter');
+    if (!step || octave === null) continue;
+    const note = parseNote(step + (alter ? (Number(alter) > 0 ? '#'.repeat(Number(alter)) : 'b'.repeat(-Number(alter))) : '') + octave);
+    if (!note) continue;
+    const midi = noteToMidi(note);
+    if (midi === null) continue;
+    count += 1;
+    if (low === null || midi < low) low = midi;
+    if (high === null || midi > high) high = midi;
+  }
+
+  return {
+    fifths: fifthsMatches.length ? fifthsMatches[0] : null,
+    allFifths: fifthsMatches,
+    mode: modeMatch ? modeMatch[1].toLowerCase() : null,
+    lowMidi: low,
+    highMidi: high,
+    noteCount: count,
+    keyChanges: new Set(fifthsMatches).size > 1,
+  };
+}
+
+function transposeMusicXml(xml, t, options = {}) {
+  const opts = { simplify: true, ...options };
+  const warnings = [];
+  let microtonal = 0;
+  let unspellable = 0;
+  let notesMoved = 0;
+
+  const movePitch = (pitchXml) => {
+    const step = readTag(pitchXml, 'step');
+    const octaveText = readTag(pitchXml, 'octave');
+    const alterText = readTag(pitchXml, 'alter');
+    if (!step || octaveText === null) return pitchXml;
+
+    const alter = alterText === null ? 0 : Number(alterText);
+    if (!Number.isInteger(alter)) { microtonal += 1; return pitchXml; }
+    if (Math.abs(alter) > 2) { unspellable += 1; return pitchXml; }
+
+    const note = { letter: step, alter, octave: parseInt(octaveText, 10) };
+    const moved = transposeAndSpell(note, t, opts);
+    notesMoved += 1;
+
+    let out = writeTag(pitchXml, 'step', moved.letter);
+    out = writeTag(out, 'octave', String(moved.octave));
+    if (moved.alter === 0) out = removeTag(out, 'alter');
+    else if (alterText === null) out = insertAlter(out, moved.alter);
+    else out = writeTag(out, 'alter', String(moved.alter));
+    return out;
+  };
+
+  let result = xml.replace(NOTE_BLOCK, (block) => {
+    const pitch = PITCH_BLOCK.exec(block);
+    if (!pitch) return block;                        // rest, or unpitched percussion
+    const before = pitch[0];
+    const after = movePitch(before);
+    let out = block.slice(0, pitch.index) + after + block.slice(pitch.index + before.length);
+
+    // The printed accidental must follow the new spelling: an A# that becomes B
+    // in a flat key needs a natural sign, not the sharp it used to carry.
+    if (/<accidental\b[^>]*>/.test(out)) {
+      const newAlter = readTag(after, 'alter');
+      const name = ACCIDENTAL_NAMES[String(newAlter === null ? 0 : Number(newAlter))];
+      if (name) out = out.replace(/(<accidental\b[^>]*>)[^<]*(<\/accidental>)/, `$1${name}$2`);
+    }
+    return out;
+  });
+
+  // Key signatures shift by a fixed number of steps around the circle of fifths.
+  if (t.sourceKey && t.targetKey) {
+    const delta = keyFifths(t.targetKey) - keyFifths(t.sourceKey);
+    let clamped = false;
+    result = result.replace(KEY_BLOCK, (block) => block.replace(
+      /<fifths>\s*(-?\d+)\s*<\/fifths>/,
+      (_, value) => {
+        let next = parseInt(value, 10) + delta;
+        while (next > 7) { next -= 12; clamped = true; }
+        while (next < -7) { next += 12; clamped = true; }
+        return `<fifths>${next}</fifths>`;
+      },
+    ));
+    if (clamped) {
+      warnings.push('A key signature needed more than 7 sharps or flats and was respelled enharmonically; check the accidentals in that section.');
+    }
+  }
+
+  // Chord symbols printed above the staff.
+  result = result.replace(HARMONY_BLOCK, (block) => {
+    let out = block;
+    for (const [stepTag, alterTag] of [['root-step', 'root-alter'], ['bass-step', 'bass-alter']]) {
+      const step = readTag(out, stepTag);
+      if (!step) continue;
+      const alterText = readTag(out, alterTag);
+      const alter = alterText === null ? 0 : Number(alterText);
+      if (!Number.isInteger(alter)) continue;
+      const moved = transposeAndSpell({ letter: step, alter, octave: null }, t, opts);
+      out = writeTag(out, stepTag, moved.letter);
+      if (moved.alter === 0) out = removeTag(out, alterTag);
+      else if (alterText === null) {
+        out = out.replace(new RegExp(`(<${stepTag}>[^<]*</${stepTag}>)`), `$1<${alterTag}>${moved.alter}</${alterTag}>`);
+      } else out = writeTag(out, alterTag, String(moved.alter));
+    }
+    return out;
+  });
+
+  if (microtonal) warnings.push(`${microtonal} microtonal note(s) had a fractional <alter> and were left untouched.`);
+  if (unspellable) warnings.push(`${unspellable} note(s) used a triple accidental and were left untouched.`);
+  if (notesMoved === 0) warnings.push('No pitched notes were found in this file.');
+
+  return { xml: result, warnings, notesMoved };
+}
+
+
+Object.assign(__m, { inspectMusicXml, transposeMusicXml, noteName });
+}
+
+/* ---- src/midi.js ---- */
+{
+/**
+ * Standard MIDI File transposition.
+ *
+ * Note numbers are single bytes, so once the event stream is walked correctly
+ * the transposition is an in-place byte edit and every track length, delta time
+ * and running-status run stays valid.
+ *
+ * Two things a naive "add N to every byte that looks like a note" gets wrong and
+ * this does not: running status (an event may omit its status byte entirely, so
+ * you cannot find note events by scanning for 0x90) and channel 10, which is
+ * percussion — transposing it turns a snare into a cowbell.
+ */
+
+const PERCUSSION_CHANNEL = 9;   // zero-indexed; "channel 10" in the manuals
+
+function readUint32(bytes, pos) {
+  return ((bytes[pos] << 24) | (bytes[pos + 1] << 16) | (bytes[pos + 2] << 8) | bytes[pos + 3]) >>> 0;
+}
+
+function readVarint(bytes, pos) {
+  let value = 0;
+  let i = pos;
+  for (let n = 0; n < 4; n += 1) {
+    const b = bytes[i];
+    if (b === undefined) throw new Error('Truncated MIDI file (unterminated variable-length value).');
+    i += 1;
+    value = (value << 7) | (b & 0x7f);
+    if ((b & 0x80) === 0) return { value, next: i };
+  }
+  throw new Error('Malformed MIDI file (variable-length value longer than 4 bytes).');
+}
+
+/**
+ * Walk every event, calling back for note bytes and key-signature metas.
+ * Shared by inspect and transpose so the two can never disagree.
+ */
+function walk(bytes, { onNote, onKeySignature }) {
+  const ascii = (pos, len) => String.fromCharCode(...bytes.slice(pos, pos + len));
+  if (bytes.length < 14 || ascii(0, 4) !== 'MThd') {
+    throw new Error('Not a Standard MIDI File (missing MThd header).');
+  }
+
+  let pos = 8 + readUint32(bytes, 4);
+  while (pos + 8 <= bytes.length) {
+    const chunkType = ascii(pos, 4);
+    const length = readUint32(bytes, pos + 4);
+    const start = pos + 8;
+    const end = Math.min(start + length, bytes.length);
+    pos = start + length;
+    if (chunkType !== 'MTrk') continue;   // skip unknown chunks, per the spec
+
+    let cursor = start;
+    let runningStatus = null;
+    while (cursor < end) {
+      ({ next: cursor } = readVarint(bytes, cursor));
+      if (cursor >= end) break;
+
+      let status = bytes[cursor];
+      if (status >= 0x80) cursor += 1;
+      else if (runningStatus !== null) status = runningStatus;
+      else throw new Error('Malformed MIDI file (data byte with no running status).');
+
+      if (status === 0xff) {
+        const metaType = bytes[cursor];
+        cursor += 1;
+        const { value: len, next } = readVarint(bytes, cursor);
+        if (metaType === 0x59 && len === 2) onKeySignature?.(next);
+        cursor = next + len;
+        runningStatus = null;
+      } else if (status === 0xf0 || status === 0xf7) {
+        const { value: len, next } = readVarint(bytes, cursor);
+        cursor = next + len;
+        runningStatus = null;
+      } else {
+        runningStatus = status;
+        const type = status & 0xf0;
+        const channel = status & 0x0f;
+        if (type === 0x80 || type === 0x90 || type === 0xa0) {
+          onNote?.(cursor, channel, type);
+          cursor += 2;
+        } else if (type === 0xb0 || type === 0xe0) {
+          cursor += 2;
+        } else if (type === 0xc0 || type === 0xd0) {
+          cursor += 1;
+        } else {
+          throw new Error(`Malformed MIDI file (unknown status byte 0x${status.toString(16)}).`);
+        }
+      }
+    }
+  }
+}
+
+function inspectMidi(bytes) {
+  let low = null;
+  let high = null;
+  let count = 0;
+  let fifths = null;
+  let mode = null;
+
+  walk(bytes, {
+    onNote(pos, channel, type) {
+      if (channel === PERCUSSION_CHANNEL) return;
+      if (type === 0xa0) return;                       // aftertouch is not a sounding note
+      if (type === 0x90 && bytes[pos + 1] === 0) return; // note-on velocity 0 == note off
+      if (type === 0x80) return;
+      const note = bytes[pos];
+      count += 1;
+      if (low === null || note < low) low = note;
+      if (high === null || note > high) high = note;
+    },
+    onKeySignature(pos) {
+      if (fifths === null) {
+        fifths = (bytes[pos] << 24) >> 24;             // signed byte
+        mode = bytes[pos + 1] === 1 ? 'minor' : 'major';
+      }
+    },
+  });
+
+  return { lowMidi: low, highMidi: high, noteCount: count, fifths, mode };
+}
+
+function transposeMidi(bytes, semitones, { fifthsDelta = null } = {}) {
+  const out = Uint8Array.from(bytes);
+  const warnings = [];
+  let moved = 0;
+  let clamped = 0;
+  let percussionSkipped = 0;
+
+  walk(out, {
+    onNote(pos, channel) {
+      if (channel === PERCUSSION_CHANNEL) { percussionSkipped += 1; return; }
+      const next = out[pos] + semitones;
+      if (next < 0 || next > 127) { clamped += 1; return; }  // leave rather than fold to a wrong octave
+      out[pos] = next;
+      moved += 1;
+    },
+    onKeySignature(pos) {
+      if (fifthsDelta === null) return;
+      let next = ((out[pos] << 24) >> 24) + fifthsDelta;
+      while (next > 7) next -= 12;
+      while (next < -7) next += 12;
+      out[pos] = next & 0xff;
+    },
+  });
+
+  if (clamped) warnings.push(`${clamped} note(s) would have fallen outside the MIDI range and were left at their original pitch.`);
+  if (percussionSkipped) warnings.push(`${percussionSkipped} percussion event(s) on channel 10 were left alone, as drums have no key.`);
+  if (moved === 0 && clamped === 0) warnings.push('No transposable notes were found in this file.');
+
+  return { bytes: out, warnings, notesMoved: moved };
+}
+
+Object.assign(__m, { inspectMidi, transposeMidi });
+}
+
+/* ---- src/mxl.js ---- */
+{
+/**
+ * Minimal reader for .mxl — the zipped MusicXML that MuseScore and Finale
+ * export by default. Entries are located through the central directory rather
+ * than by scanning for local headers, because an entry written with a data
+ * descriptor carries zeroed sizes in its local header.
+ *
+ * Only reading is supported. Transposed scores are handed back as plain
+ * .musicxml, which every notation program opens.
+ */
+
+const EOCD_SIG = 0x06054b50;
+const CD_SIG = 0x02014b50;
+
+function findEndOfCentralDirectory(view) {
+  const max = Math.min(view.byteLength, 0xffff + 22);
+  for (let i = 22; i <= max; i += 1) {
+    const pos = view.byteLength - i;
+    if (view.getUint32(pos, true) === EOCD_SIG) return pos;
+  }
+  return -1;
+}
+
+function decodeName(bytes) {
+  return new TextDecoder('utf-8').decode(bytes);
+}
+
+function listZipEntries(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const eocd = findEndOfCentralDirectory(view);
+  if (eocd === -1) throw new Error('This does not look like a .mxl file (no ZIP directory found).');
+
+  const count = view.getUint16(eocd + 10, true);
+  let pos = view.getUint32(eocd + 16, true);
+  const entries = [];
+
+  for (let i = 0; i < count; i += 1) {
+    if (view.getUint32(pos, true) !== CD_SIG) break;
+    const method = view.getUint16(pos + 10, true);
+    const compressedSize = view.getUint32(pos + 20, true);
+    const nameLength = view.getUint16(pos + 28, true);
+    const extraLength = view.getUint16(pos + 30, true);
+    const commentLength = view.getUint16(pos + 32, true);
+    const localOffset = view.getUint32(pos + 42, true);
+    const name = decodeName(bytes.subarray(pos + 46, pos + 46 + nameLength));
+
+    const localNameLength = view.getUint16(localOffset + 26, true);
+    const localExtraLength = view.getUint16(localOffset + 28, true);
+    const dataStart = localOffset + 30 + localNameLength + localExtraLength;
+
+    entries.push({ name, method, data: bytes.subarray(dataStart, dataStart + compressedSize) });
+    pos += 46 + nameLength + extraLength + commentLength;
+  }
+  return entries;
+}
+
+async function inflate(entry) {
+  if (entry.method === 0) return entry.data;
+  if (entry.method !== 8) throw new Error(`Unsupported compression in .mxl (method ${entry.method}).`);
+  if (typeof DecompressionStream === 'undefined') {
+    throw new Error('This browser cannot unzip .mxl files. Export as uncompressed .musicxml instead.');
+  }
+  const stream = new Blob([entry.data]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+/** Pull the score XML out of an .mxl container. */
+async function readMxl(buffer) {
+  const entries = listZipEntries(buffer);
+  const container = entries.find((e) => e.name === 'META-INF/container.xml');
+
+  let target = null;
+  if (container) {
+    const xml = new TextDecoder('utf-8').decode(await inflate(container));
+    const m = /<rootfile\b[^>]*full-path\s*=\s*"([^"]+)"/.exec(xml);
+    if (m) target = entries.find((e) => e.name === m[1]);
+  }
+  // Fall back to the first score-looking entry if the container is missing.
+  if (!target) {
+    target = entries.find((e) => !e.name.startsWith('META-INF/') && /\.(musicxml|xml)$/i.test(e.name));
+  }
+  if (!target) throw new Error('No score found inside this .mxl file.');
+
+  return new TextDecoder('utf-8').decode(await inflate(target));
+}
+
+Object.assign(__m, { listZipEntries, readMxl });
+}
+
+/* ---- src/range.js ---- */
+{
+const { parseNote, noteToMidi, midiToNote, noteName, spellKey, pitchClass, mod } = __m;
+/**
+ * "Which key should this person sing it in?"
+ *
+ * Given the song's melody range and the singer's comfortable range, find the
+ * transposition that seats the song inside that range. Running out of room at
+ * the TOP is weighted more heavily than at the bottom: a note above someone's
+ * ceiling is a note they cannot sing, whereas a note below it just goes quiet.
+ */
+
+
+
+/** Comfortable working ranges — a starting point, not a verdict on anyone. */
+const VOICE_PRESETS = [
+  { id: 'soprano', label: 'Soprano', low: 'C4', high: 'A5' },
+  { id: 'mezzo', label: 'Mezzo-soprano', low: 'A3', high: 'F5' },
+  { id: 'alto', label: 'Alto', low: 'F3', high: 'D5' },
+  { id: 'countertenor', label: 'Countertenor', low: 'G3', high: 'E5' },
+  { id: 'tenor', label: 'Tenor', low: 'C3', high: 'A4' },
+  { id: 'baritone', label: 'Baritone', low: 'A2', high: 'F4' },
+  { id: 'bass', label: 'Bass', low: 'E2', high: 'D4' },
+];
+
+function toMidi(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  const note = parseNote(String(value), { allowLowercase: true, requireOctave: true });
+  return note ? noteToMidi(note) : null;
+}
+
+function describeRange(lowMidi, highMidi, prefer = 'sharps') {
+  if (lowMidi === null || highMidi === null) return '—';
+  const span = highMidi - lowMidi;
+  return `${noteName(midiToNote(lowMidi, prefer))}–${noteName(midiToNote(highMidi, prefer))} (${span} semitone${span === 1 ? '' : 's'})`;
+}
+
+/**
+ * Rank transpositions from best to worst fit.
+ *
+ * Needs both song boundaries and both singer boundaries. When only the tops (or
+ * only the bottoms) are known, `simpleShift` below is the honest answer instead
+ * of inventing the missing half.
+ */
+function rankShifts({ songLow, songHigh, singerLow, singerHigh, maxShift = 12 }) {
+  if ([songLow, songHigh, singerLow, singerHigh].some((v) => v === null || v === undefined)) return null;
+
+  const songSpan = songHigh - songLow;
+  const singerSpan = singerHigh - singerLow;
+  const options = [];
+
+  for (let shift = -maxShift; shift <= maxShift; shift += 1) {
+    const low = songLow + shift;
+    const high = songHigh + shift;
+    const overTop = Math.max(0, high - singerHigh);
+    const overBottom = Math.max(0, singerLow - low);
+    const headTop = singerHigh - high;
+    const headBottom = low - singerLow;
+    const penalty = 12 * overTop + 9 * overBottom
+      + Math.abs(headTop - headBottom)
+      + 0.05 * Math.abs(shift);
+    options.push({
+      semitones: shift,
+      low,
+      high,
+      headroomTop: headTop,
+      headroomBottom: headBottom,
+      fits: overTop === 0 && overBottom === 0,
+      penalty,
+    });
+  }
+
+  options.sort((a, b) => a.penalty - b.penalty || Math.abs(a.semitones) - Math.abs(b.semitones));
+  return {
+    options,
+    best: options[0],
+    // A song wider than the singer cannot be made to fit by any transposition.
+    impossible: songSpan > singerSpan,
+    songSpan,
+    singerSpan,
+  };
+}
+
+/** One boundary known on each side: just move the song so they meet. */
+function simpleShift({ songNote, targetNote }) {
+  if (songNote === null || targetNote === null) return null;
+  return targetNote - songNote;
+}
+
+/** Resulting key after shifting `sourceKey` by `semitones`. */
+function shiftedKey(sourceKey, semitones, prefer = 'auto', hintFifths = 0) {
+  const pc = mod(pitchClass(sourceKey.tonic) + semitones, 12);
+  return spellKey(pc, sourceKey.mode, prefer, hintFifths);
+}
+
+Object.assign(__m, { VOICE_PRESETS, toMidi, describeRange, rankShifts, simpleShift, shiftedKey });
+}
+
+/* ---- src/app.js ---- */
+{
+const { makeKey, parseKey, keyName, keyLabel, keyFifths, spellKey, pitchClass, buildTransposition, describeSemitones, noteName, midiToNote, mod, analyzeSheet, transposeSheet, detectKey, inspectMusicXml, transposeMusicXml, inspectMidi, transposeMidi, readMxl, VOICE_PRESETS, toMidi, describeRange, rankShifts, shiftedKey } = __m;
+/** UI layer. All music decisions live in the modules; this file only wires. */
+
+
+
+
+
+
+
+
+
+const SAMPLE = `{title: Amazing Grace}
+{key: E}
+
+[Verse 1]
+E                 E7        A            E
+Amazing grace how sweet the sound that saved a wretch like me
+E                       C#m       B7
+I once was lost, but now am found, was
+E        A        E   B7   E
+blind but now I see
+
+[Verse 2]
+E                  E7         A           E
+'Twas grace that taught my heart to fear, and grace my fears relieved
+E                     C#m          B7
+How precious did that grace appear the
+E        A       E   B7   E
+hour I first believed`;
+
+const state = {
+  kind: 'text',            // text | musicxml | midi
+  filename: null,
+  text: SAMPLE,
+  xml: null,
+  midiBytes: null,
+  sourceKey: null,
+  sourceLocked: false,
+  semitones: 1,
+  octaves: 0,
+  prefer: 'auto',
+  simplify: true,
+  nashville: false,
+  overrides: {},
+  isSample: true,
+  tab: 'result',
+  singerLow: null,
+  singerHigh: null,
+  songLow: null,
+  songHigh: null,
+  songRangeFromFile: false,
+  fileWarnings: [],
+};
+
+const $ = (sel, root = document) => root.querySelector(sel);
+const el = (tag, props = {}, kids = []) => {
+  const node = Object.assign(document.createElement(tag), props);
+  for (const k of [].concat(kids)) node.append(k);
+  return node;
+};
+
+/* ------------------------------------------------------------- derive --- */
+
+/** Everything downstream of the current inputs, recomputed on every render. */
+function derive() {
+  const analysis = state.kind === 'text' ? analyzeSheet(state.text, state.overrides) : null;
+
+  let detected = null;
+  if (analysis) {
+    detected = detectKey(analysis.chords, analysis.declaredKey);
+  } else if (state.kind === 'musicxml' && state.xml) {
+    const info = inspectMusicXml(state.xml);
+    if (info.fifths !== null) detected = { key: keyFromFifths(info.fifths, info.mode), confidence: 1, source: 'file' };
+  } else if (state.kind === 'midi' && state.midiBytes) {
+    const info = inspectMidi(state.midiBytes);
+    if (info.fifths !== null) detected = { key: keyFromFifths(info.fifths, info.mode), confidence: 1, source: 'file' };
+  }
+
+  const sourceKey = state.sourceKey ?? detected?.key ?? makeKey('C');
+  const total = state.semitones + state.octaves * 12;
+  const hint = keyFifths(sourceKey);
+  const targetKey = spellKey(mod(pitchClass(sourceKey.tonic) + total, 12), sourceKey.mode, state.prefer, hint);
+  const t = buildTransposition(sourceKey, targetKey, total);
+
+  return { analysis, detected, sourceKey, targetKey, transposition: t, total };
+}
+
+function keyFromFifths(fifths, mode) {
+  const order = ['F', 'C', 'G', 'D', 'A', 'E', 'B'];
+  const index = Math.max(-7, Math.min(13, fifths)) + 1;
+  let letter;
+  let alter = 0;
+  if (index >= 0 && index < 7) letter = order[index];
+  else if (index >= 7) { letter = order[index - 7]; alter = 1; }
+  else { letter = order[index + 7]; alter = -1; }
+  return { tonic: { letter, alter, octave: null }, mode: mode === 'minor' ? 'minor' : 'major' };
+}
+
+/** "E major — 4 sharps (F# C# G# D#)" */
+function signatureLine(key) {
+  const fifths = keyFifths(key);
+  if (fifths === 0) return 'no sharps or flats';
+  const sharps = ['F', 'C', 'G', 'D', 'A', 'E', 'B'];
+  const flats = ['B', 'E', 'A', 'D', 'G', 'C', 'F'];
+  const n = Math.abs(fifths);
+  const names = (fifths > 0 ? sharps : flats).slice(0, Math.min(n, 7)).map((l) => l + (fifths > 0 ? '♯' : '♭'));
+  return `${n} ${fifths > 0 ? 'sharp' : 'flat'}${n === 1 ? '' : 's'} · ${names.join(' ')}`;
+}
+
+/* ------------------------------------------------------------ render --- */
+
+function render() {
+  const d = derive();
+  renderIntake();
+  renderControls(d);
+  renderSheet(d);
+  renderVoice(d);
+}
+
+function renderControls(d) {
+  const { sourceKey, targetKey, total, detected } = d;
+
+  // The selects hold tonics only — the mode lives in its own control — so a
+  // minor key must be matched by its tonic, not by "Am".
+  $('#source-key').value = noteName(sourceKey.tonic, { withOctave: false });
+  $('#source-mode').value = sourceKey.mode;
+  $('#target-key').value = noteName(targetKey.tonic, { withOctave: false });
+  $('#semitone-readout').innerHTML =
+    `<b>${total > 0 ? '+' : ''}${total}</b><span>${describeSemitones(total).replace(/ \(.*\)$/, '')}</span>`;
+  $('#octave-readout').textContent = state.octaves === 0 ? '±0' : (state.octaves > 0 ? `+${state.octaves}` : `${state.octaves}`);
+
+  $('#source-sig').textContent = signatureLine(sourceKey);
+  $('#target-sig').textContent = `${keyLabel(targetKey)} · ${signatureLine(targetKey)}`;
+
+  const src = detected?.source;
+  $('#detect-note').textContent = state.sourceLocked
+    ? 'Set by you.'
+    : src === 'declared' ? 'From the {key} line in the file.'
+      : src === 'file' ? 'From the file’s key signature.'
+        : detected ? `Detected from the chords${detected.confidence < 0.15 ? ' — low confidence, check it' : ''}.`
+          : 'No chords found yet.';
+
+  for (const chip of document.querySelectorAll('[data-prefer]')) {
+    chip.setAttribute('aria-pressed', String(chip.dataset.prefer === state.prefer));
+  }
+  $('#opt-simplify').checked = state.simplify;
+  $('#opt-nashville').checked = state.nashville;
+
+  // A capo is the guitarist's version of this transposition, and only works upward.
+  const capo = mod(total, 12);
+  $('#capo-hint').textContent = state.kind !== 'text' || capo === 0
+    ? ''
+    : `Guitarists: keep playing the ${keyName(sourceKey)} shapes with a capo on fret ${capo}.`;
+}
+
+function renderSheet(d) {
+  const { analysis, transposition, sourceKey, targetKey, total } = d;
+  const out = $('#output');
+  out.replaceChildren();
+  const notes = [];
+
+  if (state.kind === 'text') {
+    const result = transposeSheet(analysis, transposition, {
+      simplify: state.simplify,
+      nashville: state.nashville,
+      nashvilleKey: sourceKey,
+    });
+    $('#stat-chords').textContent = analysis.chords.length;
+    $('#stat-format').textContent = analysis.format === 'chordpro' ? 'ChordPro' : 'Chords over lyrics';
+
+    const pre = el('pre', { className: 'sheet' });
+    result.lines.forEach((line, i) => {
+      const row = el('span', { className: 'ln' + (line.type === 'chords' ? ' is-chords' : '') });
+      if (line.type === 'chords' || line.type === 'lyric') {
+        row.classList.add('clickable');
+        row.tabIndex = 0;
+        row.title = line.type === 'chords'
+          ? 'Read as a chord line — click to treat it as lyrics instead'
+          : 'Read as lyrics — click to treat it as a chord line instead';
+        const flip = () => {
+          state.overrides[i] = line.type === 'chords' ? 'lyric' : 'chords';
+          render();
+        };
+        row.addEventListener('click', flip);
+        row.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } });
+      }
+      for (const seg of line.segments) {
+        row.append(seg.kind === 'plain' ? seg.text : el('span', { className: seg.kind, textContent: seg.text }));
+      }
+      row.append('\n');
+      pre.append(row);
+    });
+    out.append(el('div', { className: 'sheet-scroll' }, pre));
+    notes.push(...analysis.warnings.map((w) => ({ kind: 'warn', text: w })));
+    state.resultText = result.text;
+
+    if (state.octaves !== 0) {
+      notes.push({
+        kind: 'info',
+        text: 'Chord names carry no octave, so the octave control leaves this chart unchanged. It only affects MusicXML and MIDI. To make a song easier to sing, change the key instead.',
+      });
+    }
+  } else if (state.kind === 'musicxml') {
+    const result = transposeMusicXml(state.xml, transposition, { simplify: state.simplify });
+    state.resultText = result.xml;
+    state.resultName = (state.filename || 'score').replace(/\.(mxl|musicxml|xml)$/i, '') + `-${keyName(targetKey)}.musicxml`;
+    $('#stat-chords').textContent = result.notesMoved;
+    $('#stat-format').textContent = 'MusicXML score';
+    out.append(fileResultCard(`${result.notesMoved} notes moved`, 'Download the transposed score and open it in MuseScore, Sibelius, Finale or Dorico.'));
+    notes.push(...result.warnings.map((w) => ({ kind: 'warn', text: w })));
+  } else if (state.kind === 'midi') {
+    const fifthsDelta = keyFifths(targetKey) - keyFifths(sourceKey);
+    const result = transposeMidi(state.midiBytes, total, { fifthsDelta });
+    state.resultBytes = result.bytes;
+    state.resultName = (state.filename || 'song').replace(/\.midi?$/i, '') + `-${keyName(targetKey)}.mid`;
+    $('#stat-chords').textContent = result.notesMoved;
+    $('#stat-format').textContent = 'MIDI file';
+    out.append(fileResultCard(`${result.notesMoved} note events moved`, 'Drums on channel 10 are left where they are.'));
+    notes.push(...result.warnings.map((w) => ({ kind: 'warn', text: w })));
+  }
+
+  $('#stat-from').textContent = keyLabel(sourceKey);
+  $('#stat-to').textContent = keyLabel(targetKey);
+  $('#stat-move').textContent = total === 0 ? 'unchanged' : describeSemitones(total);
+
+  notes.push(...state.fileWarnings.map((w) => ({ kind: 'bad', text: w })));
+  const notesBox = $('#notes');
+  notesBox.replaceChildren(...notes.map((n) => el('p', { className: `note ${n.kind === 'warn' ? '' : n.kind}`, textContent: n.text })));
+  notesBox.hidden = notes.length === 0;
+
+  $('#btn-download').hidden = state.kind === 'text';
+  $('#btn-copy').hidden = state.kind !== 'text';
+}
+
+/** Keep the intake zone in step with what is actually loaded. */
+function renderIntake() {
+  const intake = $('#intake');
+  const loaded = state.filename !== null || (!state.isSample && state.kind === 'text');
+  intake.classList.toggle('loaded', loaded);
+  $('#btn-choose').textContent = loaded ? 'Choose another file' : 'Choose a file';
+  $('#btn-sample').hidden = loaded;
+  $('#example-pill').hidden = !state.isSample;
+
+  if (!loaded) {
+    $('#intake-title').textContent = 'Drop your song here';
+    $('#intake-sub').innerHTML = 'Chord sheet <code>.txt</code> <code>.pro</code> <code>.crd</code> · MusicXML <code>.musicxml</code> <code>.mxl</code> · MIDI <code>.mid</code> — or <button type="button" class="linkish" id="go-paste">paste your chords instead</button>';
+    $('#go-paste').addEventListener('click', showPastePane);
+    return;
+  }
+
+  const kindLabel = { text: 'Chord sheet', musicxml: 'MusicXML score', midi: 'MIDI file' }[state.kind];
+  $('#intake-title').textContent = state.filename ?? 'Your pasted chords';
+  $('#intake-sub').innerHTML = `${kindLabel} loaded — <button type="button" class="linkish" id="go-paste">${state.kind === 'text' ? 'view or edit it' : 'paste chords instead'}</button>`;
+  $('#go-paste').addEventListener('click', showPastePane);
+}
+
+function showPastePane() {
+  const tab = document.querySelector('[data-tab="source"]');
+  tab.click();
+  document.querySelector('.workbench').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setTimeout(() => $('#editor').focus(), 320);
+}
+
+function fileResultCard(headline, detail) {
+  return el('div', { className: 'verdict fits' }, [
+    el('p', { className: 'headline', innerHTML: `<b>${headline}</b>` }),
+    el('p', { className: 'hint', textContent: detail }),
+  ]);
+}
+
+/* ------------------------------------------------------ voice finder --- */
+
+const KEYBOARD_LOW = 36;   // C2
+const KEYBOARD_HIGH = 84;  // C6
+const IS_BLACK = (m) => [1, 3, 6, 8, 10].includes(mod(m, 12));
+
+function whiteIndex(midi) {
+  let n = 0;
+  for (let m = KEYBOARD_LOW; m < midi; m += 1) if (!IS_BLACK(m)) n += 1;
+  return n;
+}
+const TOTAL_WHITE = whiteIndex(KEYBOARD_HIGH + 1);
+
+/** Horizontal position of a pitch, as a percentage across the keyboard. */
+function xPercent(midi) {
+  const clamped = Math.max(KEYBOARD_LOW, Math.min(KEYBOARD_HIGH, midi));
+  const i = IS_BLACK(clamped) ? whiteIndex(clamped) - 0.5 : whiteIndex(clamped);
+  return (i / TOTAL_WHITE) * 100;
+}
+
+function buildKeyboard() {
+  const board = $('#keyboard');
+  board.replaceChildren();
+  const w = 100 / TOTAL_WHITE;
+  for (let m = KEYBOARD_LOW; m <= KEYBOARD_HIGH; m += 1) {
+    if (IS_BLACK(m)) {
+      board.append(el('div', {
+        className: 'black',
+        style: `left:${xPercent(m) + w * 0.18}%;width:${w * 0.64}%`,
+      }));
+    } else {
+      board.append(el('div', {
+        className: 'white',
+        style: `left:${xPercent(m)}%;width:${w}%`,
+      }));
+      if (mod(m, 12) === 0) {
+        board.append(el('div', {
+          className: 'octave-label',
+          style: `left:${xPercent(m) + w * 0.12}%`,
+          textContent: 'C' + (Math.floor(m / 12) - 1),
+        }));
+      }
+    }
+  }
+}
+
+function renderVoice(d) {
+  const { sourceKey, total } = d;
+  const board = $('#keyboard');
+  for (const b of board.querySelectorAll('.band')) b.remove();
+
+  const bands = [];
+  if (state.singerLow !== null && state.singerHigh !== null && state.singerHigh > state.singerLow) {
+    bands.push(['singer', state.singerLow, state.singerHigh]);
+  }
+  if (state.songLow !== null && state.songHigh !== null) {
+    bands.push(['before', state.songLow, state.songHigh]);
+    bands.push(['after', state.songLow + total, state.songHigh + total]);
+  }
+  for (const [cls, lo, hi] of bands) {
+    const left = xPercent(lo);
+    const right = xPercent(hi) + (100 / TOTAL_WHITE);
+    board.append(el('div', { className: `band ${cls}`, style: `left:${left}%;width:${Math.max(1, right - left)}%` }));
+  }
+
+  $('#song-range-text').textContent = describeRange(state.songLow, state.songHigh);
+  $('#singer-range-text').textContent = describeRange(state.singerLow, state.singerHigh);
+
+  const verdict = $('#verdict');
+  const list = $('#shift-options');
+  list.replaceChildren();
+
+  const ranked = rankShifts({
+    songLow: state.songLow, songHigh: state.songHigh,
+    singerLow: state.singerLow, singerHigh: state.singerHigh,
+  });
+
+  if (!ranked) {
+    verdict.className = 'verdict';
+    verdict.replaceChildren(
+      el('p', { className: 'headline', textContent: 'Fill in both ranges to get a recommendation.' }),
+      el('p', {
+        className: 'hint',
+        textContent: state.songRangeFromFile
+          ? 'The song’s range came from your file. Add the singer’s comfortable low and high notes.'
+          : 'Enter the lowest and highest notes of the melody, and the singer’s comfortable low and high notes. Upload a MusicXML or MIDI file and the song’s range is read automatically.',
+      }),
+    );
+    return;
+  }
+
+  const best = ranked.best;
+  const targetForBest = shiftedKey(sourceKey, best.semitones, state.prefer, keyFifths(sourceKey));
+  verdict.className = 'verdict' + (best.fits ? ' fits' : '');
+  verdict.replaceChildren(
+    el('p', {
+      className: 'headline',
+      innerHTML: best.semitones === 0
+        ? `Already the best fit — leave it in <b>${keyLabel(sourceKey)}</b>.`
+        : `Sing it in <b>${keyLabel(targetForBest)}</b> — ${describeSemitones(best.semitones)}.`,
+    }),
+    el('p', {
+      className: 'hint',
+      textContent: ranked.impossible
+        ? `The melody spans ${ranked.songSpan} semitones but this range covers ${ranked.singerSpan}. No key fits the whole song; this is the closest, and ${best.headroomTop < 0 ? `${-best.headroomTop} note(s) still sit above the ceiling` : `${-best.headroomBottom} note(s) still sit below the floor`}.`
+        : `Leaves ${best.headroomTop} semitone${best.headroomTop === 1 ? '' : 's'} of room above the highest note and ${best.headroomBottom} below the lowest.`,
+    }),
+  );
+
+  for (const option of ranked.options.slice(0, 5)) {
+    const key = shiftedKey(sourceKey, option.semitones, state.prefer, keyFifths(sourceKey));
+    const row = el('div', { className: 'option-row' }, [
+      el('span', { className: 'shift', textContent: `${option.semitones > 0 ? '+' : ''}${option.semitones}` }),
+      el('span', {}, [
+        el('b', { textContent: keyLabel(key), style: 'font-weight:500' }),
+        el('span', { className: 'rng', textContent: '  ' + describeRange(option.low, option.high) }),
+      ]),
+      el('span', { className: 'tag' + (option.fits ? ' ok' : ''), textContent: option.fits ? 'fits' : 'tight' }),
+    ]);
+    const apply = el('button', { className: 'btn small', textContent: 'Use' });
+    apply.addEventListener('click', () => {
+      state.octaves = Math.trunc(option.semitones / 12);
+      state.semitones = option.semitones - state.octaves * 12;
+      render();
+      document.querySelector('.workbench').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    row.append(apply);
+    list.append(row);
+  }
+}
+
+/* -------------------------------------------------------------- input --- */
+
+async function loadFile(file) {
+  state.filename = file.name;
+  state.isSample = false;
+  state.fileWarnings = [];
+  state.overrides = {};
+  state.sourceKey = null;
+  state.sourceLocked = false;
+  const lower = file.name.toLowerCase();
+
+  try {
+    if (lower.endsWith('.mid') || lower.endsWith('.midi')) {
+      state.midiBytes = new Uint8Array(await file.arrayBuffer());
+      const info = inspectMidi(state.midiBytes);
+      state.kind = 'midi';
+      state.songLow = info.lowMidi; state.songHigh = info.highMidi; state.songRangeFromFile = true;
+    } else if (lower.endsWith('.mxl') || lower.endsWith('.musicxml') || lower.endsWith('.xml')) {
+      state.xml = lower.endsWith('.mxl') ? await readMxl(await file.arrayBuffer()) : await file.text();
+      const info = inspectMusicXml(state.xml);
+      state.kind = 'musicxml';
+      state.songLow = info.lowMidi; state.songHigh = info.highMidi; state.songRangeFromFile = true;
+      if (info.keyChanges) state.fileWarnings.push('This score changes key part-way through. Every section is moved by the same interval, which keeps the music correct.');
+    } else if (lower.endsWith('.pdf') || /\.(png|jpe?g|gif|webp|heic|tiff?)$/.test(lower)) {
+      state.fileWarnings.push(`${file.name} is a PDF or a photo, so it holds a picture of notes rather than notes themselves and cannot be transposed. Open it in MuseScore (which can scan simple scores), or export MusicXML from wherever the score came from, then bring that back here.`);
+      state.filename = null;
+      render();
+      return;
+    } else {
+      state.kind = 'text';
+      state.text = await file.text();
+      state.songRangeFromFile = false;
+      $('#editor').value = state.text;
+    }
+  } catch (error) {
+    state.fileWarnings.push(`${file.name} could not be read: ${error.message}`);
+  }
+  syncSongRangeInputs();
+  render();
+}
+
+function syncSongRangeInputs() {
+  $('#song-low').value = state.songLow === null ? '' : noteName(midiToNote(state.songLow));
+  $('#song-high').value = state.songHigh === null ? '' : noteName(midiToNote(state.songHigh));
+}
+
+function download(name, data, type) {
+  const blob = new Blob([data], { type });
+  const url = URL.createObjectURL(blob);
+  const a = el('a', { href: url, download: name });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/* ---------------------------------------------------------- listeners --- */
+
+function populateKeySelects() {
+  // Circle of fifths, sharps then flats — how musicians actually scan a key list.
+  const ordered = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#', 'F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb'];
+  for (const id of ['#source-key', '#target-key']) {
+    const select = $(id);
+    select.replaceChildren(...ordered.map((n) => el('option', { value: n, textContent: n })));
+  }
+  $('#voice-preset').replaceChildren(
+    el('option', { value: '', textContent: 'Choose a voice…' }),
+    ...VOICE_PRESETS.map((p) => el('option', { value: p.id, textContent: `${p.label} (${p.low}–${p.high})` })),
+  );
+}
+
+function setSource(key) {
+  state.sourceKey = key;
+  state.sourceLocked = true;
+  render();
+}
+
+function wire() {
+  $('#step-down').addEventListener('click', () => { state.semitones -= 1; normaliseSemitones(); render(); });
+  $('#step-up').addEventListener('click', () => { state.semitones += 1; normaliseSemitones(); render(); });
+  $('#oct-down').addEventListener('click', () => { state.octaves -= 1; render(); });
+  $('#oct-up').addEventListener('click', () => { state.octaves += 1; render(); });
+  $('#reset').addEventListener('click', () => { state.semitones = 0; state.octaves = 0; render(); });
+
+  $('#source-key').addEventListener('change', (e) => {
+    setSource(makeKey(e.target.value, $('#source-mode').value));
+  });
+  $('#source-mode').addEventListener('change', (e) => {
+    const current = derive().sourceKey;
+    setSource(makeKey(noteName(current.tonic, { withOctave: false }), e.target.value));
+  });
+  $('#target-key').addEventListener('change', (e) => {
+    const source = derive().sourceKey;
+    const wanted = parseKey(e.target.value);
+    const up = mod(pitchClass(wanted.tonic) - pitchClass(source.tonic), 12);
+    state.semitones = up > 6 ? up - 12 : up;   // pick the shorter journey
+    render();
+  });
+
+  for (const chip of document.querySelectorAll('[data-prefer]')) {
+    chip.addEventListener('click', () => { state.prefer = chip.dataset.prefer; render(); });
+  }
+  $('#opt-simplify').addEventListener('change', (e) => { state.simplify = e.target.checked; render(); });
+  $('#opt-nashville').addEventListener('change', (e) => { state.nashville = e.target.checked; render(); });
+
+  const editor = $('#editor');
+  editor.value = state.text;
+  editor.addEventListener('input', () => {
+    state.kind = 'text';
+    state.text = editor.value;
+    state.overrides = {};
+    state.fileWarnings = [];
+    state.isSample = editor.value === SAMPLE;
+    if (!state.isSample) state.filename = null;
+    render();
+  });
+
+  for (const button of document.querySelectorAll('[data-tab]')) {
+    button.addEventListener('click', () => {
+      state.tab = button.dataset.tab;
+      for (const b of document.querySelectorAll('[data-tab]')) b.setAttribute('aria-selected', String(b === button));
+      $('#pane-source').hidden = state.tab !== 'source';
+      $('#pane-result').hidden = state.tab !== 'result';
+    });
+  }
+
+  $('#btn-choose').addEventListener('click', () => $('#file').click());
+  $('#file').addEventListener('change', (e) => {
+    if (e.target.files[0]) loadFile(e.target.files[0]);
+    e.target.value = '';   // so re-picking the same file still fires
+  });
+
+  // The whole page accepts a drop — aiming at a small target is a needless
+  // demand to make of someone who just wants their song transposed.
+  const intake = $('#intake');
+  let depth = 0;
+  document.addEventListener('dragenter', (e) => {
+    if (![...(e.dataTransfer?.types ?? [])].includes('Files')) return;
+    e.preventDefault(); depth += 1; intake.classList.add('over');
+  });
+  document.addEventListener('dragover', (e) => {
+    if ([...(e.dataTransfer?.types ?? [])].includes('Files')) e.preventDefault();
+  });
+  document.addEventListener('dragleave', () => {
+    depth = Math.max(0, depth - 1);
+    if (depth === 0) intake.classList.remove('over');
+  });
+  document.addEventListener('drop', (e) => {
+    e.preventDefault(); depth = 0; intake.classList.remove('over');
+    if (e.dataTransfer.files[0]) {
+      loadFile(e.dataTransfer.files[0]);
+      document.querySelector('.workbench').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+
+  $('#btn-copy').addEventListener('click', async (e) => {
+    await navigator.clipboard.writeText(state.resultText ?? '');
+    const button = e.currentTarget;
+    button.textContent = 'Copied';
+    setTimeout(() => { button.textContent = 'Copy chart'; }, 1400);
+  });
+  $('#btn-download').addEventListener('click', () => {
+    if (state.kind === 'midi') download(state.resultName, state.resultBytes, 'audio/midi');
+    else if (state.kind === 'musicxml') download(state.resultName, state.resultText, 'application/vnd.recordare.musicxml+xml');
+  });
+  $('#btn-print').addEventListener('click', () => window.print());
+  $('#btn-sample').addEventListener('click', () => {
+    state.kind = 'text'; state.text = SAMPLE; state.overrides = {}; state.fileWarnings = [];
+    state.sourceKey = null; state.sourceLocked = false; state.songRangeFromFile = false;
+    state.isSample = true; state.filename = null;
+    editor.value = SAMPLE;
+    render();
+  });
+
+  $('#voice-preset').addEventListener('change', (e) => {
+    const preset = VOICE_PRESETS.find((p) => p.id === e.target.value);
+    if (!preset) return;
+    state.singerLow = toMidi(preset.low);
+    state.singerHigh = toMidi(preset.high);
+    $('#singer-low').value = preset.low;
+    $('#singer-high').value = preset.high;
+    render();
+  });
+  const bindNote = (id, field) => $(id).addEventListener('input', (e) => {
+    state[field] = toMidi(e.target.value.trim());
+    e.target.setAttribute('aria-invalid', String(e.target.value.trim() !== '' && state[field] === null));
+    render();
+  });
+  bindNote('#singer-low', 'singerLow');
+  bindNote('#singer-high', 'singerHigh');
+  bindNote('#song-low', 'songLow');
+  bindNote('#song-high', 'songHigh');
+
+  $('#theme').addEventListener('click', () => {
+    const now = document.documentElement.getAttribute('data-theme');
+    const next = now === 'dark' ? 'light' : now === 'light' ? 'dark'
+      : (matchMedia('(prefers-color-scheme: dark)').matches ? 'light' : 'dark');
+    document.documentElement.setAttribute('data-theme', next);
+    $('#theme').setAttribute('aria-label', `Switch to ${next === 'dark' ? 'light' : 'dark'} theme`);
+  });
+}
+
+/** Keep the semitone control inside one octave; whole octaves live in their
+ *  own control, so the two never quietly duplicate each other. */
+function normaliseSemitones() {
+  if (state.semitones > 11) { state.semitones -= 12; state.octaves += 1; }
+  if (state.semitones < -11) { state.semitones += 12; state.octaves -= 1; }
+}
+
+populateKeySelects();
+buildKeyboard();
+wire();
+render();
+}
+
+</script>
